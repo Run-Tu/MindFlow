@@ -87,21 +87,18 @@ class WebController:
         # meaning it does not need to be updated.
         # this is a bad temporary fix lol
 
-        browsers = {"chrome": ["AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.3",
-                               "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.3"],
-                    "firefox": ["Gecko/20100101 Firefox/127.",
-                                "Gecko/20100101 Firefox/126."],
-                    "edge": ["AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.",
-                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/125.0.0.",
-                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0."]}
+        version = browsers.get(self.chosen_browser)["version"].split(".")[-1]
         
-        platforms = {"Windows": ["Windows NT 10.0; Win64; x64",
-                            "Windows NT 10.0; Win64; x64; rv:127.0"],
-                    "Darwin": ["Macintosh; Intel Mac OS X 10_15_7"],
-                    "Linux": ["X11; Linux x86_64"]}
+        browsers = {"chrome": f"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version}.0.0.0 Safari/537.3",
+                    "firefox": f"Gecko/20100101 Firefox/{version}.",
+                    "edge": f"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version}.0.0.0 Safari/537.36 Edg/126.0.0."}
         
-        os_platform = random.choice(platforms[platform.system()])
-        browser = random.choice(browsers[self.chosen_browser])
+        platforms = {"Windows": "Windows NT 10.0; Win64; x64",
+                    "Darwin": "Macintosh; Intel Mac OS X 10_15_7",
+                    "Linux": "X11; Linux x86_64"}
+        
+        os_platform = platforms[platform.system()]
+        browser = browsers[self.chosen_browser]
 
         user_agent = f"Mozilla/5.0 ({os_platform}) {browser}"
         if self.chosen_browser == "firefox":

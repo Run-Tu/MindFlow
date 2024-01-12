@@ -4,6 +4,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 import requests
+from markdownify import markdownify as md
+import time
+
 # {"role": "assistant", "type": "code", "format": "python", "start": True}???
 
 class ApiKey:
@@ -30,6 +33,8 @@ class SearchEngine:
     def search(self, query: str, complexity: int = 3):
         if self.key.key == 'selenium':
             return self.selenium_search(query, complexity)
+        elif self.engine == 'google':
+            return self.google_search(query, complexity)
         
     def wait_until(self, condition: tuple[By, str], timeout: int = 30):
         WebDriverWait(self.browser, timeout).until(EC.presence_of_element_located(condition))
@@ -48,6 +53,29 @@ class SearchEngine:
                 results[index][key] = elem.get_attribute('href') if key == "link" else elem.text
 
         return results
+    
+    def to_markdown(self, html: str) -> str:
+
+        start = time.time()
+        mark = md(html)
+        print(f"converted in {time.time() - start}s")
+
+        return mark
+
+    def load_site(self, site: str, clean: bool = True):
+        engine = self.engines[self.engine]
+        self.browser.get(site)
+        if clean:
+            body = self.browser.find_element(By.TAG_NAME, 'body')
+            web_context = self.to_markdown(body.get_attribute('innerHTML'))
+
+            return web_context
+        else:
+            return self.browser.page_source
+        
+    def load_search(self, query: dict, clean: bool = True):
+        site = self.load_site(query["link"], clean)
+        return query | {"content": site}
     
     def results_filter(self, results: list):
         
