@@ -1,82 +1,61 @@
-from utils.screwdriver import WebController
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
+import asyncio
 import requests
-from markdownify import markdownify as md
+from playwright.async_api import async_playwright
 import time
 
-# {"role": "assistant", "type": "code", "format": "python", "start": True}???
-
 class ApiKey:
-    def __init__(self, key: str = "selenium", engine: str = "google"):
+    def __init__(self, key: str = "playwright", engine: str = "google"):
         self.key = key
         self.engine = engine
 
     def __str__(self):
         return f'{self.engine}: {self.key}'
-    
+
 class SearchEngine:
     def __init__(self, key: ApiKey = ApiKey()):
         self.key = key
         self.engine = key.engine
 
-        if self.key.key == "selenium":
-            self.driver = WebController()
-            self.browser = self.driver.webdriver()
+        if self.key.key == "playwright":
             self.engines = {"google": {"engine":"https://www.google.com/search?q=",
-                                       "search": {"title": (By.CLASS_NAME, "MBeuO"),
-                                                  "description": (By.CLASS_NAME, "r025kc"),
-                                                  "link": (By.CSS_SELECTOR, 'a[jsname="UWckNb"]')}}} 
+                                       "search": {"title": 'h3.LC20lb',
+                                                  "description": 'div.r025kc',
+                                                  "link": 'div.yuRUbf > div > span > a'}}}
+
+    async def playwright_search(self, query: str, complexity: int = 3):
+        async with async_playwright() as p:
+            self.driver = await p.chromium.launch()
+            start = time.time()
+            self.page = await self.driver.new_page()
+            engine = self.engines[self.engine]
+            await self.page.goto(engine["engine"] + query)
+
+            keys = {key:None for key in engine["search"].keys()}
+            results = [dict(keys) for _ in range(complexity)]
+            for key, selector in engine["search"].items():
+                elements = await self.page.query_selector_all(selector)
+                elements = elements[:complexity]
+
+                for index, elem in enumerate(elements):
+                    if key == "link":
+                        results[index][key] = await elem.get_attribute('href')
+                    else:   
+                        results[index][key] = await elem.inner_text()
+
+            print(f"completed in {time.time() - start} s")
+            await self.driver.close()
+            return results
 
     def search(self, query: str, complexity: int = 3):
-        if self.key.key == 'selenium':
-            return self.selenium_search(query, complexity)
+        if self.key.key == 'playwright':
+            return asyncio.run(self.playwright_search(query, complexity))
         elif self.engine == 'google':
             return self.google_search(query, complexity)
-        
-    def wait_until(self, condition: tuple[By, str], timeout: int = 30):
-        WebDriverWait(self.browser, timeout).until(EC.presence_of_element_located(condition))
-        
-    def selenium_search(self, query: str, complexity: int = 3):
-        engine = self.engines[self.engine]
-        self.browser.get(engine["engine"] + query)
 
-        keys = {key:None for key in engine["search"].keys()}
-        results = [dict(keys) for _ in range(complexity)]
-        for key, identifier in engine["search"].items():
-            self.wait_until(identifier)
-            elements = self.browser.find_elements(*identifier)[:complexity]
-
-            for index, elem in enumerate(elements):
-                results[index][key] = elem.get_attribute('href') if key == "link" else elem.text
-
-        return results
-    
-    def to_markdown(self, html: str) -> str:
-
-        start = time.time()
-        mark = md(html)
-        print(f"converted in {time.time() - start}s")
-
-        return mark
-
-    def load_site(self, site: str, clean: bool = True):
-        engine = self.engines[self.engine]
-        self.browser.get(site)
-        if clean:
-            body = self.browser.find_element(By.TAG_NAME, 'body')
-            web_context = self.to_markdown(body.get_attribute('innerHTML'))
-
-            return web_context
-        else:
-            return self.browser.page_source
-        
     def load_search(self, query: dict, clean: bool = True):
         site = self.load_site(query["link"], clean)
         return query | {"content": site}
-    
+
     def results_filter(self, results: list):
         
         if self.engine == "google":
@@ -101,7 +80,6 @@ class SearchEngine:
             response = requests.get(base_url, params=params)
             data = response.json()
 
-            # lmao wtf is this
             if (items := data.get("items", [])):
                 return self.results_filter(items)
             else:
@@ -109,5 +87,3 @@ class SearchEngine:
 
         except requests.RequestException as e:
             return f"Error fetching search results: {e}"
-
-
