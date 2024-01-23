@@ -2,6 +2,7 @@ import asyncio
 import requests
 from playwright.async_api import async_playwright
 import time
+import re
 
 class ApiKey:
     def __init__(self, key: str = "playwright", engine: str = "google"):
@@ -12,9 +13,17 @@ class ApiKey:
         return f'{self.engine}: {self.key}'
 
 class SearchEngine:
-    def __init__(self, key: ApiKey = ApiKey()):
+    def __init__(self, key: ApiKey = ApiKey(),
+                 ignore: tuple[str] = None):
         self.key = key
         self.engine = key.engine
+
+        if (ignore is None or ignore is False):
+            self.ignore = ("png","jpg","jpeg","svg","gif", "css","woff","woff2","mp3","mp4")
+        else:
+            self.ignore = ignore
+
+        self.ignore_regex = re.compile(r"\.(" + "|".join(self.ignore) + ")$")
 
         if self.key.key == "playwright":
             self.engines = {"google": {"engine":"https://www.google.com/search?q=",
@@ -24,27 +33,36 @@ class SearchEngine:
 
     async def playwright_search(self, query: str, complexity: int = 3):
         async with async_playwright() as p:
-            self.driver = await p.chromium.launch()
+            browser = await p.chromium.launch()
             start = time.time()
-            self.page = await self.driver.new_page()
+            page = await browser.new_page()
+
+            # Abort css and other uneccesary requests
+            await page.route(self.ignore_regex, lambda route: route.abort())
+
             engine = self.engines[self.engine]
-            await self.page.goto(engine["engine"] + query)
+            await page.goto(engine["engine"] + query)
 
-            keys = {key:None for key in engine["search"].keys()}
-            results = [dict(keys) for _ in range(complexity)]
-            for key, selector in engine["search"].items():
-                elements = await self.page.query_selector_all(selector)
-                elements = elements[:complexity]
-
-                for index, elem in enumerate(elements):
-                    if key == "link":
-                        results[index][key] = await elem.get_attribute('href')
-                    else:   
-                        results[index][key] = await elem.inner_text()
+            results = await self.extract_results(page, engine["search"], complexity)
 
             print(f"completed in {time.time() - start} s")
-            await self.driver.close()
+            await browser.close()
             return results
+
+    async def extract_results(self, page, selectors, complexity):
+        keys = {key: None for key in selectors.keys()}
+        results = [dict(keys) for _ in range(complexity)]
+        for key, selector in selectors.items():
+            elements = await page.query_selector_all(selector)
+            elements = elements[:complexity]
+
+            for index, elem in enumerate(elements):
+                if key == "link":
+                    results[index][key] = await elem.get_attribute('href')
+                else:
+                    results[index][key] = await elem.inner_text()
+        return results
+
 
     def search(self, query: str, complexity: int = 3):
         if self.key.key == 'playwright':
