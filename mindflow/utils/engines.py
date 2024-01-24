@@ -1,7 +1,7 @@
 import asyncio
 import requests
 from playwright.async_api import async_playwright
-import time
+from markdownify import markdownify as md
 import re
 
 class ApiKey:
@@ -12,17 +12,17 @@ class ApiKey:
     def __str__(self):
         return f'{self.engine}: {self.key}'
 
-class SearchEngine:
+class Search:
     def __init__(self, key: ApiKey = ApiKey(),
                  ignore: tuple[str] = None):
         self.key = key
         self.engine = key.engine
+        self.loop = asyncio.get_event_loop()
 
         if (ignore is None or ignore is False):
             self.ignore = ("png","jpg","jpeg","svg","gif", "css","woff","woff2","mp3","mp4")
         else:
             self.ignore = ignore
-
         self.ignore_regex = re.compile(r"\.(" + "|".join(self.ignore) + ")$")
 
         if self.key.key == "playwright":
@@ -30,29 +30,20 @@ class SearchEngine:
                                        "search": {"title": 'h3.LC20lb',
                                                   "description": 'div.r025kc',
                                                   "link": 'div.yuRUbf > div > span > a'}}}
+            self.loop.run_until_complete(self.init_playwright())
 
     async def playwright_search(self, query: str, complexity: int = 3):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            start = time.time()
-            page = await browser.new_page()
+        page = await self.browser.new_page()
 
-            # Abort css and other uneccesary requests
-            await page.route(self.ignore_regex, lambda route: route.abort())
+        # Abort css and other uneccesary requests
+        await page.route(self.ignore_regex, lambda route: route.abort())
 
-            engine = self.engines[self.engine]
-            await page.goto(engine["engine"] + query)
+        engine = self.engines[self.engine]
+        await page.goto(engine["engine"] + query)  # Join the list into a string
 
-            results = await self.extract_results(page, engine["search"], complexity)
-
-            print(f"completed in {time.time() - start} s")
-            await browser.close()
-            return results
-
-    async def extract_results(self, page, selectors, complexity):
-        keys = {key: None for key in selectors.keys()}
+        keys = {key: None for key in engine["search"].keys()}
         results = [dict(keys) for _ in range(complexity)]
-        for key, selector in selectors.items():
+        for key, selector in engine["search"].items():
             elements = await page.query_selector_all(selector)
             elements = elements[:complexity]
 
@@ -61,14 +52,29 @@ class SearchEngine:
                     results[index][key] = await elem.get_attribute('href')
                 else:
                     results[index][key] = await elem.inner_text()
+
+        await page.close()
         return results
 
 
-    def search(self, query: str, complexity: int = 3):
+    async def init_playwright(self):
+        self.playwright = await async_playwright().__aenter__()
+        self.browser = await self.playwright.chromium.launch(headless=True)
+
+    async def close_playwright(self):
+        await self.browser.close()
+        await self.playwright.__aexit__()
+
+    def search(self, queries: list, complexity: int = 3):
         if self.key.key == 'playwright':
-            return asyncio.run(self.playwright_search(query, complexity))
+            return self.loop.run_until_complete(self.run_search(queries, complexity))
         elif self.engine == 'google':
-            return self.google_search(query, complexity)
+            return {query: self.google_search(query, complexity) for query in queries}
+
+    async def run_search(self, queries: list, complexity: int = 3):
+        tasks = tuple(self.playwright_search(query, complexity) for query in queries)
+        results = await asyncio.gather(*tasks)
+        return dict(zip(queries, results))
 
     def load_search(self, query: dict, clean: bool = True):
         site = self.load_site(query["link"], clean)
@@ -105,3 +111,23 @@ class SearchEngine:
 
         except requests.RequestException as e:
             return f"Error fetching search results: {e}"
+
+    async def to_markdown(self, html: str) -> str:
+        return md(html)
+
+    async def load_site(self, site: str, clean: bool = True):
+        page = await self.browser.new_page()
+        await page.goto(site)
+        if clean:
+            body = await page.query_selector('body')
+            html = await body.inner_html()
+            web_context = await self.to_markdown(html)
+
+            return web_context
+        else:
+            return await page.content()
+
+    async def load_search(self, query: dict, clean: bool = True):
+        site = await self.load_site(query["link"], clean)
+        return query | {"content": site}
+
