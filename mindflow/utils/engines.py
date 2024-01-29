@@ -5,18 +5,18 @@ from markdownify import markdownify as md
 import re
 
 class ApiKey:
-    def __init__(self, key: str = "playwright", engine: str = "google"):
+    def __init__(self, key: str = "playwright", name: str = "google"):
         self.key = key
-        self.engine = engine
+        self.name = name
 
     def __str__(self):
-        return f'{self.engine}: {self.key}'
+        return f'{self.name}: {self.key}'
 
 class Search:
     def __init__(self, key: ApiKey = ApiKey(),
                  ignore: tuple[str] = None):
         self.key = key
-        self.engine = key.engine
+        self.name = key.name
         self.loop = asyncio.get_event_loop()
 
         if (ignore is None or ignore is False):
@@ -38,7 +38,7 @@ class Search:
         # Abort css and other uneccesary requests
         await page.route(self.ignore_regex, lambda route: route.abort())
 
-        engine = self.engines[self.engine]
+        engine = self.engines[self.name]
         await page.goto(engine["engine"] + query)  # Join the list into a string
 
         keys = {key: None for key in engine["search"].keys()}
@@ -68,7 +68,7 @@ class Search:
     def search(self, queries: list, complexity: int = 3):
         if self.key.key == 'playwright':
             return self.loop.run_until_complete(self.run_search(queries, complexity))
-        elif self.engine == 'google':
+        elif self.name == 'google':
             return {query: self.google_search(query, complexity) for query in queries}
 
     async def run_search(self, queries: list, complexity: int = 3):
@@ -82,7 +82,7 @@ class Search:
 
     def results_filter(self, results: list):
         
-        if self.engine == "google":
+        if self.name == "google":
             title, link, desc = "title", "link", "snippet"
             
         return [{"title": result[title],

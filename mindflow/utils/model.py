@@ -1,41 +1,35 @@
-from utils.engines import ApiKey, SearchEngine
-
-class Task:
-    def __init__(self, name: str):
-        self.name = name
-
-class Browser(Task):
-    def __init__(self, 
-                 api_key: ApiKey = ApiKey("selenium")):
-        
-        self.api_key = api_key
-        self.engine = SearchEngine(api_key)
-
-        self.driver = self.engine.driver
-        self.browser = self.engine.browser
-
-    def to_searches(self, text: str) -> tuple[str]:
-        # ai function to generate 
-        search = None
-        return search
-    
-    def web_search(self, text: str):
-        return self.engine.search(text)
-
-    def load_site(self, url: str):
-        return 
-
-class Computer:
-    def __init__(self):
-        
-
-        
+from utils.engines import ApiKey, Search
+import asyncio
+import json
+from litellm import LLM
 
 class Model:
-    def __init__(self):
-        # self.pipelines = {browser: browser, brrowser}
-        pass
+    def __init__(self, api_key):
+        self.llm = LLM(api_key)
 
-    def run(self, task: Task):
+    async def respond(self, prompt):
+        # Classify the prompt
+        needs_search = await self.classify_prompt(prompt)
 
-        pass
+        # If the prompt needs a web search, perform the search
+        if needs_search['search']:
+            # search_results = await self.perform_search(prompt)
+            return f"This needs some searchin! {str(needs_search)}" # TEMPORARY
+
+        # Otherwise, generate a response using LLM
+        response = await self.llm.complete(prompt)
+        return response
+
+    async def classify_prompt(self, prompt):
+        # GPT-4o to classify the prompt
+        # placeholder function, will be modified for cheaper and better respo
+
+        prompt = ("""Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {'search': [...], 'complexity': n}, note, the '...' will contain web searches you might have based on the question. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. otherwise {'search': []}. Do not say anything else, regardless of what the question states.
+                  \n\nQUESTION: """ + prompt)
+        classification = await self.llm.complete(prompt)  # Hypothetical classification
+        return json.loads(classification)
+
+    async def perform_search(self, query):
+        # placeholder function
+        return f"Search results for '{query}'"
+
