@@ -29,10 +29,70 @@ class Search:
             self.engines = {"google": {"engine":"https://www.google.com/search?q=",
                                        "search": {"title": 'h3.LC20lb',
                                                   "description": 'div.r025kc',
-                                                  "link": 'div.yuRUbf > div > span > a'}}}
+                                                  "link": 'div.yuRUbf > div > span > a'}},
+                                       "widgets": {"weather": "",
+                                                   "showtimes": self.get_showtimes,
+                                                   "events": self.get_events,
+                                                   "reviews":""}}
+            
             self.loop.run_until_complete(self.init_playwright())
 
-    async def playwright_search(self, query: str, complexity: int = 3):
+    async def get_events(self, page):
+        classnames = {
+            "title": "div.YOGjf",
+            "location": "div.zvDXNd",
+            "time": "div.cEZxRc"
+        }
+
+        button = "ZFiwCf"
+        await page.click(f'.{button}')
+
+        keys = {key: None for key in classnames}
+        events = []
+        for key, selector in classnames.items():
+            elements = await page.query_selector_all(selector)
+            if not events:
+                events = [dict(keys) for _ in len(elements)]
+
+            for index, elem in enumerate(elements):
+                events[index][key] = await elem.inner_text()
+        return events
+
+    async def get_showtimes(self, page):
+        classnames = {
+            "venue": "YS9glc",
+            "location": "O4B9Zb"
+        }
+
+        container = "div.Evln0c"
+        subcontainer = "div.iAkOed"
+        plans = "div.swoqy"
+        times = "div.std-ts"
+
+        keys = {key: None for key in classnames}
+        events = []
+        for key, selector in classnames.items():
+            elements = await page.query_selector_all(selector)
+            if not events:
+                events = [dict(keys) for _ in len(elements)]
+
+            for index, elem in enumerate(elements):
+                events[index][key] = await elem.inner_text()
+            
+        elements = await page.query_selector_all(container)
+        for index, element in enumerate(elements):
+            sub = await element.query_selector_all(subcontainer)
+            for plan in sub:
+                mode = await plan.query_selector(plans)
+                times = await plan.query_selector_all(times)
+                events[index][mode.inner_text()] = [time.inner_text() for time in times]
+
+        return events
+
+
+    async def playwright_search(self, query: str, 
+                                complexity: int = 3, 
+                                widgets: str = None):
         page = await self.browser.new_page()
 
         # Abort css and other uneccesary requests
@@ -41,17 +101,23 @@ class Search:
         engine = self.engines[self.name]
         await page.goto(engine["engine"] + query)  # Join the list into a string
 
+        results = {"searches": [],
+                   "widget": []}
+        # load widgets
+        for widget in widgets:
+            results["widget"] = engine["widgets"][widget](page) 
+
         keys = {key: None for key in engine["search"].keys()}
-        results = [dict(keys) for _ in range(complexity)]
+        results["searches"] = [dict(keys) for _ in range(complexity)]
         for key, selector in engine["search"].items():
             elements = await page.query_selector_all(selector)
             elements = elements[:complexity]
 
             for index, elem in enumerate(elements):
                 if key == "link":
-                    results[index][key] = await elem.get_attribute('href')
+                    results["searches"][index][key] = await elem.get_attribute('href')
                 else:
-                    results[index][key] = await elem.inner_text()
+                    results["searches"][index][key] = await elem.inner_text()
 
         await page.close()
         return results
