@@ -33,7 +33,7 @@ class Search:
                                        "widgets": {"weather": "",
                                                    "showtimes": self.get_showtimes,
                                                    "events": self.get_events,
-                                                   "reviews":""}}
+                                                   "reviews": self.get_reviews}}
             
             self.loop.run_until_complete(self.init_playwright())
 
@@ -89,6 +89,44 @@ class Search:
 
         return events
 
+    async def get_reviews(self, page):
+        classnames = {
+            "site": "span.rhsB",
+            "rating": "span.gsrt"
+        }
+
+        rating_class = "div.xt8Uw"
+
+        keys = {key: None for key in classnames}
+        events = []
+        for key, selector in classnames.items():
+            elements = await page.query_selector_all(selector)
+            if not events:
+                events = [dict(keys) for _ in len(elements)]
+
+            for index, elem in enumerate(elements):
+                events[index][key] = await elem.inner_text()
+
+        rating = page.query_selector(rating_class)
+        events.append({"site": "Google Reviews", "rating": rating.inner_text() + "/5.0"})
+
+    async def get_weather(self, page):
+        classnames = {
+            "weather": "span#wob_dc",
+            "time": "span#wob_dts",
+            "temperature": "span#wob_tm",
+            "unit": "span.wob_t",
+            "precipitation": "span#wob_pp",
+            "humidity": "span#wob_hm",
+            "wind": "span#wob_ws"
+        }
+
+        info = {key: None for key in classnames}
+        for key, selector in classnames.items():
+            element = await page.query_selector(selector)
+            info[key] = element.inner_text()
+
+        return info
 
     async def playwright_search(self, query: str, 
                                 complexity: int = 3, 
