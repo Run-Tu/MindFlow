@@ -32,4 +32,7 @@ class Model:
     async def perform_search(self, query):
         # placeholder function
         return f"Search results for '{query}'"
+    
+    async def chat(self, message: str, model = "gpt-4o"):
+        pass
 
