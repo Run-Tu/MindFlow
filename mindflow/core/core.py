@@ -1,7 +1,8 @@
-from .engines import Search
-from .computer import Computer
-from .model import Model
+from .utils.engines import Search
+from .utils.computer import Computer
+from .utils.model import Model
 from pathlib import Path
+import os
 
 class MindFlow:
     """
@@ -17,12 +18,15 @@ class MindFlow:
                  local: bool = False,
                  computer = None,
                  browser = None,
-                 model = None) -> None:
+                 model = None,
+                 tasks = False) -> None:
         
         # utils
         self.browser = Search() if browser is None else browser
         self.computer = Computer() if computer is None else computer
         self.model = Model() if model is None else model
+
+        self.tasks = tasks
 
         # logging + debugging
         self.verbose = verbose
@@ -36,13 +40,23 @@ class MindFlow:
         # experimental
         self.local = local
 
+        # prompts
+        self.prompts = {}
+        prompts = os.listdir(self.prompts_dir)
+        for filename in prompts:
+            with open(Path(self.prompts_dir, filename), "r") as f:
+                self.prompts[filename.split('.')[0]] = f.read().strip()
+
+    def render_prompt(self):
+        pass
+        
+
     def classify(self, message):
         """
         Classify whether the message is either a question, task or routine.
         """
-        with open(Path(self.prompts_dir, "classify.txt"), "r") as f:
-            prompt = f.read()
-        return self.model.chat(prompt + message, model="gpt-4o")
+        return self.model.chat(self.prompts["classify"] + message, 
+                               model="gpt-4o")
 
     def chat(self, 
              message: str = None, 
@@ -69,6 +83,9 @@ class MindFlow:
             print(response)
 
     def set_task(self):
+        # doing task for the first time, load `initial_task.txt`
+        if not self.tasks:
+            pass
         pass
 
     def set_routine(self):

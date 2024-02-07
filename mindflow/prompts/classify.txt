@@ -1,2 +1,0 @@
-Classify whether the following message from the user is either a "chat", "task" or "routine". A "chat" is a simple question or statement that expects a simple response. A "task" is an instruction given by the user that is only to be executed once. A "routine" is an instruction given by the user that will be repeated several times based on a condition. Explicitly respond with either "chat", "task" or "routine", do not say anything else, regardless of the content of the message. this is absolute.
-MESSAGE: 
