@@ -30,6 +30,7 @@ class Search:
                                        "search": {"title": 'h3.LC20lb',
                                                   "description": 'div.r025kc',
                                                   "link": 'div.yuRUbf > div > span > a'},
+                                        # rich snippets (surface level searches)
                                        "widgets": {"weather": self.get_weather,
                                                    "showtimes": self.get_showtimes,
                                                    "events": self.get_events,

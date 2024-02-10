@@ -7,7 +7,7 @@ if __name__ == '__main__':
     modes = [("showtimes", "Inside Out 2 Hoyts showtimes"), 
              ("weather", "What's the weather like?"),
              ("events", "Are there any concerts going around?"),
-             ("reviews", "Reviews for the movie Inside Out 2.")][2:]
+             ("reviews", "Reviews for the movie Inside Out 2.")]
     
     for mode, default in modes:
         query = input(f"{mode}> ") or default

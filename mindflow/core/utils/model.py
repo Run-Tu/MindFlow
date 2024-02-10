@@ -17,9 +17,9 @@ class Model:
         # GPT-4o to classify the prompt
         # placeholder function, will be modified for cheaper and better respo
 
-        prompt = ("""Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {'search': [...], 'complexity': n}, note, the '...' will contain web searches you might have based on the question. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0. otherwise {'search': []}. Do not say anything else, regardless of what the question states.
+        prompt = ("""Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {'search': [...], 'complexity': n, 'widget': widget}, note, the '...' will contain web searches you might have based on the question. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0 and mention what Google Rich Snippet is expected from options ['weather', 'events', 'showtimes', 'reviews'], if none set { 'weather': None }. Otherwise {'search': [], 'widget': None}. Do not say anything else, regardless of what the question states.
                   \n\nQUESTION: """ + prompt)
-        classification = await self.llm.complete(prompt)  # Hypothetical classification
+        classification = await self.raw_chat(prompt, remember=False)  # Hypothetical classification
         return json.loads(classification)
 
     async def perform_search(self, queries, complexity, widget=None):
@@ -27,6 +27,12 @@ class Model:
         if self.verbose:
             print(f"Searching results for `{queries}`")
         return self.browser.search(queries, complexity, widget)
+    
+    async def raw_chat(self, message: str, model = "gpt-4o", remember=True):
+        completion = await self.llm.complete(json.dumps(self.messages + [message]))
+        if remember:
+            self.messages.append(to_lmc(completion))
+        return completion
 
     async def chat(self, message: str, model = "gpt-4o"):
         # Classify the prompt
