@@ -1,4 +1,4 @@
-from utils.engines import Search
+from ..mindflow.core.utils.engines import Search
 import time
 
 if __name__ == '__main__':

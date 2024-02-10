@@ -29,11 +29,11 @@ class Search:
             self.engines = {"google": {"engine":"https://www.google.com/search?q=",
                                        "search": {"title": 'h3.LC20lb',
                                                   "description": 'div.r025kc',
-                                                  "link": 'div.yuRUbf > div > span > a'}},
+                                                  "link": 'div.yuRUbf > div > span > a'},
                                        "widgets": {"weather": self.get_weather,
                                                    "showtimes": self.get_showtimes,
                                                    "events": self.get_events,
-                                                   "reviews": self.get_reviews}}
+                                                   "reviews": self.get_reviews}}}
             
             self.loop.run_until_complete(self.init_playwright())
 
@@ -41,53 +41,75 @@ class Search:
         classnames = {
             "title": "div.YOGjf",
             "location": "div.zvDXNd",
-            "time": "div.cEZxRc"
+            "time": "div.SHrHx > div.cEZxRc:not(.zvDXNd)"
         }
 
-        button = "ZFiwCf"
-        await page.click(f'.{button}')
+        button = "div.MmMIvd"
+        expanded = "div#Q5Vznb"
+        popup = "g-raised-button.Hg3NO"
+        await page.wait_for_selector(popup)
+
+        buttons = await page.query_selector_all(popup)
+        await buttons[1].click()
+
+        await page.click(button)
+        await page.wait_for_selector(expanded)
 
         keys = {key: None for key in classnames}
         events = []
         for key, selector in classnames.items():
             elements = await page.query_selector_all(selector)
-            if not events:
-                events = [dict(keys) for _ in len(elements)]
+            if events == []:
+                events = [dict(keys) for _ in range(len(elements))]
 
             for index, elem in enumerate(elements):
-                events[index][key] = await elem.inner_text()
+                if key == "location" :
+                    if index % 2: # odd
+                        n = await elem.inner_text()
+                        events[index // 2][key] = temp + ', ' + n
+                    else:
+                        temp = await elem.inner_text()
+                else:
+                    events[index][key] = await elem.inner_text()
+
         return events
 
     async def get_showtimes(self, page):
         classnames = {
-            "venue": "YS9glc",
-            "location": "O4B9Zb"
+            "venue": "div.YS9glc > div:not([class])",
+            "location": "div.O4B9Zb"
         }
 
         container = "div.Evln0c"
         subcontainer = "div.iAkOed"
         plans = "div.swoqy"
-        times = "div.std-ts"
+        times_selector = "div.std-ts"
 
         keys = {key: None for key in classnames}
         events = []
         for key, selector in classnames.items():
             elements = await page.query_selector_all(selector)
-            if not events:
-                events = [dict(keys) for _ in len(elements)]
+            if events == []:
+                events = [dict(keys) for _ in range(len(elements))]
 
             for index, elem in enumerate(elements):
-                events[index][key] = await elem.inner_text()
-            
+                if key == 'location':
+                    location = await elem.inner_text()
+                    events[index][key] = location.replace("·", " away, at ")
+                else:
+                    events[index][key] = await elem.inner_text()
+
         elements = await page.query_selector_all(container)
         for index, element in enumerate(elements):
             sub = await element.query_selector_all(subcontainer)
             for plan in sub:
                 mode = await plan.query_selector(plans)
-                times = await plan.query_selector_all(times)
-                events[index][mode.inner_text()] = [time.inner_text() for time in times]
+                mode_text = await mode.inner_text()
+                times = await plan.query_selector_all(times_selector)
+                events[index][mode_text] = [await time.inner_text() for time in times]
 
         return events
+
 
     async def get_reviews(self, page):
         classnames = {
@@ -102,20 +124,22 @@ class Search:
         for key, selector in classnames.items():
             elements = await page.query_selector_all(selector)
             if not events:
-                events = [dict(keys) for _ in len(elements)]
+                events = [dict(keys) for _ in range(len(elements))]
 
             for index, elem in enumerate(elements):
                 events[index][key] = await elem.inner_text()
 
-        rating = page.query_selector(rating_class)
-        events.append({"site": "Google Reviews", "rating": rating.inner_text() + "/5.0"})
+        rating = await page.query_selector(rating_class)
+        events.append({"site": "Google Reviews", "rating": await rating.inner_text() + "/5.0"})
+
+        return events
 
     async def get_weather(self, page):
         classnames = {
             "weather": "span#wob_dc",
-            "time": "span#wob_dts",
+            "time": "div#wob_dts",
             "temperature": "span#wob_tm",
-            "unit": "span.wob_t",
+            "unit": "div.wob-unit > span[style='display:inline']",
             "precipitation": "span#wob_pp",
             "humidity": "span#wob_hm",
             "wind": "span#wob_ws"
@@ -124,7 +148,7 @@ class Search:
         info = {key: None for key in classnames}
         for key, selector in classnames.items():
             element = await page.query_selector(selector)
-            info[key] = element.inner_text()
+            info[key] = await element.inner_text()
 
         return info
 
@@ -143,7 +167,7 @@ class Search:
                    "widget": []}
         # load widgets
         for widget in widgets:
-            results["widget"] = engine["widgets"][widget](page) 
+            results["widget"] = await engine["widgets"][widget](page) 
 
         keys = {key: None for key in engine["search"].keys()}
         results["searches"] = [dict(keys) for _ in range(complexity)]
@@ -169,14 +193,14 @@ class Search:
         await self.browser.close()
         await self.playwright.__aexit__()
 
-    def search(self, queries: list, complexity: int = 3):
+    def search(self, queries: list, complexity: int = 3, widget=None):
         if self.key.key == 'playwright':
-            return self.loop.run_until_complete(self.run_search(queries, complexity))
+            return self.loop.run_until_complete(self.run_search(queries, complexity, widget))
         elif self.name == 'google':
             return {query: self.google_search(query, complexity) for query in queries}
 
-    async def run_search(self, queries: list, complexity: int = 3):
-        tasks = tuple(self.playwright_search(query, complexity) for query in queries)
+    async def run_search(self, queries: list, complexity: int = 3, widget=None):
+        tasks = tuple(self.playwright_search(query, complexity, widget) for query in queries)
         results = await asyncio.gather(*tasks)
         return dict(zip(queries, results))
 

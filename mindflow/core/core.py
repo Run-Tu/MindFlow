@@ -24,7 +24,7 @@ class MindFlow:
         # utils
         self.browser = Search() if browser is None else browser
         self.computer = Computer() if computer is None else computer
-        self.model = Model() if model is None else model
+        self.model = Model(messages) if model is None else model
 
         self.tasks = tasks
 
@@ -35,7 +35,8 @@ class MindFlow:
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
-        self.messages = [] if messages is None else messages
+        
+        self.model.messages = [] if messages is None else messages
 
         # experimental
         self.local = local
@@ -62,8 +63,7 @@ class MindFlow:
              message: str = None, 
              display: bool = True, 
              stream: bool = False):
-        
-        self.messages.append(self.to_lmc(message, role="user"))        
+    
         mode = self.classify(message).lower()
 
         if mode == "chat":
@@ -77,7 +77,6 @@ class MindFlow:
 
     def set_chat(self, message, display):
         response = self.model.chat(message, model="gpt-4o")
-        self.messages.append(self.to_lmc(response))
 
         if display:
             print(response)
@@ -90,12 +89,3 @@ class MindFlow:
 
     def set_routine(self):
         pass
-
-    def to_lmc(self, 
-               content: str, 
-               role: str = "assistant",
-               type="message") -> dict:
-        return {"role": role, "type": type, "content": content}
-
-
-
