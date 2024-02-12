@@ -2,6 +2,7 @@ from .utils.engines import Search
 from .utils.computer import Computer
 from .utils.model import Model
 from pathlib import Path
+import asyncio
 import os
 
 class MindFlow:
@@ -15,7 +16,7 @@ class MindFlow:
             history_dir: Path | None = None,
             skills_dir: Path | None = None,
             prompts_dir: Path | None = None,
-            verbose: bool = False,
+            verbose: bool = True,
             local: bool = False,
             computer = None,
             browser = None,
@@ -25,7 +26,7 @@ class MindFlow:
         # utils
         self.browser = Search() if browser is None else browser
         self.computer = Computer() if computer is None else computer
-        self.model = Model(messages) if model is None else model
+        self.model = Model(messages=messages) if model is None else model
 
         self.tasks = tasks
 
@@ -57,16 +58,21 @@ class MindFlow:
         """
         Classify whether the message is either a question, task or routine.
         """
-        return self.model.raw_chat(self.prompts["classify"] + message, 
-                                   remember=False)
+        response = self.model.raw_chat(message, 
+                                       remember=False, 
+                                       system=self.prompts["classify"])
+        return response
 
     def chat(self, 
-             message: str = None, 
-             display: bool = True, 
-             stream: bool = False):
+            message: str = None, 
+            display: bool = True, 
+            stream: bool = False):
     
-        mode = self.classify(message).lower()
-
+        mode = self.classify(message)
+        mode = mode.lower()
+        if self.verbose:
+            print('Determined conversation type:', mode)
+    
         if mode == "chat":
             self.run_chat(message, display)
         elif mode == "task":
@@ -76,11 +82,13 @@ class MindFlow:
         else:
             raise ValueError("Invalid classification of message.")
 
+
     def run_chat(self, message, display):
-        response = self.model.chat(message, model="gpt-4o")
+        response = self.model.chat(message)
 
         if display:
             print(response)
+        return
 
     def run_task(self):
         # doing task for the first time, load `initial_task.txt`

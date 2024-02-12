@@ -1,4 +1,4 @@
-from .core import MindFlow
+from .core.core import MindFlow
 
 macro = MindFlow()
 computer = macro.computer

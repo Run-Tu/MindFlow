@@ -1,10 +1,12 @@
+import atexit
 import asyncio
 import requests
 from playwright.async_api import async_playwright
 from markdownify import markdownify as md
+from ..defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
 import re
 
-class ApiKey:
+class Apikey:
     def __init__(self, key: str = "playwright", name: str = "google"):
         self.key = key
         self.name = name
@@ -12,11 +14,30 @@ class ApiKey:
     def __str__(self):
         return f'{self.name}: {self.key}'
 
+class Profile:
+    """
+    store apikeys here. this is temp since its a bad setup omg.
+    """
+    def __init__(
+            self, 
+            keys: dict = {"llm": LLM_DEFAULT,
+                          "code": CODE_DEFAULT,
+                          "vision": VISION_DEFAULT,
+                          "browser": "playwright"}, 
+            search_engine: str = "google",
+            name: str = None):
+        self.keys = keys
+        self.search_engine = search_engine
+        self.name = "User" if name is None else name
+
+    def __str__(self):
+        return f'Profile({self.name}, {self.keys})'
+
 class Search:
-    def __init__(self, key: ApiKey = ApiKey(),
+    def __init__(self, key: Profile = Profile(),
                  ignore: tuple[str] = None):
-        self.key = key
-        self.name = key.name
+        self.key = key.keys.get("browser", "playwright")
+        self.name = key.search_engine
         self.loop = asyncio.get_event_loop()
 
         if (ignore is None or ignore is False):
@@ -25,7 +46,7 @@ class Search:
             self.ignore = ignore
         self.ignore_regex = re.compile(r"\.(" + "|".join(self.ignore) + ")$")
 
-        if self.key.key == "playwright":
+        if self.key == "playwright":
             self.engines = {"google": {"engine":"https://www.google.com/search?q=",
                                        "search": {"title": 'h3.LC20lb',
                                                   "description": 'div.r025kc',
@@ -155,7 +176,7 @@ class Search:
 
     async def playwright_search(self, query: str, 
                                 complexity: int = 3, 
-                                widgets: str = None):
+                                widget: str = None):
         page = await self.browser.new_page()
 
         # Abort css and other uneccesary requests
@@ -167,8 +188,8 @@ class Search:
         results = {"searches": [],
                    "widget": []}
         # load widgets
-        for widget in widgets:
-            results["widget"] = await engine["widgets"][widget](page) 
+        #for widget in widgets:
+        results["widget"] = await engine["widgets"][widget](page) 
 
         keys = {key: None for key in engine["search"].keys()}
         results["searches"] = [dict(keys) for _ in range(complexity)]
@@ -191,11 +212,13 @@ class Search:
         self.browser = await self.playwright.chromium.launch(headless=True)
 
     async def close_playwright(self):
-        await self.browser.close()
-        await self.playwright.__aexit__()
+            for page in self.browser.pages:
+                await page.close()
+            await self.browser.close()
+            await self.playwright.__aexit__()
 
     def search(self, queries: list, complexity: int = 3, widget=None):
-        if self.key.key == 'playwright':
+        if self.key == 'playwright':
             return self.loop.run_until_complete(self.run_search(queries, complexity, widget))
         elif self.name == 'google':
             return {query: self.google_search(query, complexity) for query in queries}
@@ -223,7 +246,7 @@ class Search:
         cx = "65a4f09c14c4846ee"
 
         params = {
-            "key": self.key.key,
+            "key": self.key,
             "cx": cx,
             "q": query,
             "num": complexity
