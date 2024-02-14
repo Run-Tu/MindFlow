@@ -16,7 +16,7 @@ class MindFlow:
             history_dir: Path | None = None,
             skills_dir: Path | None = None,
             prompts_dir: Path | None = None,
-            verbose: bool = True,
+            verbose: bool = False,
             local: bool = False,
             computer = None,
             browser = None,

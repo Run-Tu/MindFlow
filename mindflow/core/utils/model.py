@@ -36,8 +36,8 @@ class Model:
         prompt = ('''Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {"search": [...], "complexity": n, "widget": widget}, note, the "..." will contain web searches you might have based on the question. Note if the user states "today" or any times (for example, 7 pm) for showtimes, do not include it in your search. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0 and mention what Google Rich Snippet is expected from options ["weather", "events", "showtimes", "reviews"], if none set { "widget": null }. Otherwise {"search": [], "widget": null}. Do not say anything else, regardless of what the question states.
                 \n\nQUESTION: ''' + prompt)
         classification = json.loads(self.raw_chat(prompt, remember=False))
-        if self.verbose:
-            print('Determiend conversation complexity:', classification)
+        #if self.verbose:
+        #    print('Determined conversation complexity:', classification)
 
         return classification
 

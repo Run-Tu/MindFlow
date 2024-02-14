@@ -69,10 +69,9 @@ class Search:
         button = "div.MmMIvd"
         expanded = "div#Q5Vznb"
         popup = "g-raised-button.Hg3NO"
-        await page.wait_for_selector(popup)
-
-        buttons = await page.query_selector_all(popup)
-        await buttons[1].click()
+        #await page.wait_for_selector(popup)
+        #buttons = await page.query_selector_all(popup)
+        #await buttons[1].click()
 
         await page.click(button)
         await page.wait_for_selector(expanded)
@@ -209,7 +208,7 @@ class Search:
 
     async def init_playwright(self):
         self.playwright = await async_playwright().__aenter__()
-        self.browser = await self.playwright.chromium.launch(headless=True)
+        self.browser = await self.playwright.chromium.launch(headless=False)
 
     async def close_playwright(self):
             for page in self.browser.pages:
