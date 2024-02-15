@@ -59,6 +59,7 @@ class MindFlow:
         Classify whether the message is either a question, task or routine.
         """
         response = self.model.raw_chat(message, 
+                                       context = [],
                                        remember=False, 
                                        system=self.prompts["classify"])
         return response
@@ -72,6 +73,8 @@ class MindFlow:
         mode = mode.lower()
         if self.verbose:
             print('Determined conversation type:', mode)
+        print()
+        print(mode)
     
         if mode == "chat":
             self.run_chat(message, display)
@@ -87,7 +90,7 @@ class MindFlow:
         response = self.model.chat(message)
 
         if display:
-            print(response)
+            print("MindFlow> " + response)
         return
 
     def run_task(self):
