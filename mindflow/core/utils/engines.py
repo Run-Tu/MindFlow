@@ -3,6 +3,7 @@ import asyncio
 import requests
 from playwright.async_api import async_playwright
 from markdownify import markdownify as md
+from bs4 import BeautifulSoup
 from ..defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
 import re
 
@@ -29,6 +30,8 @@ class Profile:
         self.keys = keys
         self.search_engine = search_engine
         self.name = "User" if name is None else name
+        
+        self.ignore = frozenset(("main menu", "move to sidebar", "navigation", "contribute", "search", "appearance", "tools", "personal tools", "pages for logged out editors", "move to sidebar", "hide", "show", "toggle the table of contents", "general", "actions", "in other projects", "print/export"))
 
     def __str__(self):
         return f'Profile({self.name}, {self.keys})'
@@ -125,7 +128,10 @@ class Search:
             sub = await element.query_selector_all(subcontainer)
             for plan in sub:
                 mode = await plan.query_selector(plans)
-                mode_text = await mode.inner_text()
+                
+                if mode: mode_text = await mode.inner_text()
+                else: mode_text = 'times'
+                
                 times = await plan.query_selector_all(times_selector)
                 events[index][mode_text] = [await time.inner_text() for time in times]
 
@@ -184,11 +190,11 @@ class Search:
         engine = self.engines[self.name]
         await page.goto(engine["engine"] + query)  # Join the list into a string
 
-        results = {"searches": [],
-                   "widget": []}
+        results = {"searches": []}
         # load widgets
         #for widget in widgets:
-        results["widget"] = await engine["widgets"][widget](page) 
+        if widget:
+            results["widget"] = await engine["widgets"][widget](page) 
 
         keys = {key: None for key in engine["search"].keys()}
         results["searches"] = [dict(keys) for _ in range(complexity)]
@@ -208,7 +214,7 @@ class Search:
 
     async def init_playwright(self):
         self.playwright = await async_playwright().__aenter__()
-        self.browser = await self.playwright.chromium.launch(headless=False)
+        self.browser = await self.playwright.chromium.launch(headless=True)
 
     async def close_playwright(self):
             for page in self.browser.pages:
@@ -227,9 +233,30 @@ class Search:
         results = await asyncio.gather(*tasks)
         return dict(zip(queries, results))
 
-    def load_search(self, query: dict, clean: bool = True):
-        site = self.load_site(query["link"], clean)
+    async def load_search(self, query: dict, clean: bool = True):
+        site = await self.load_site(query["link"], clean)
         return query | {"content": site}
+    
+    def load_searches(self, queries: dict, complexity: int):
+        # must be a better way to do this in async than flattening it
+        tasks = []
+        for query in queries.values():
+            tasks += [self.load_search(site) for site in query['searches']]
+            
+        loop = asyncio.get_event_loop()
+        results = loop.run_until_complete(asyncio.gather(*tasks))
+        
+        pairs = [results[i:i + complexity] for i in range(0, len(results), complexity)]
+
+        # really bad algo :/
+        i = 0
+        for query in queries:
+            for content in pairs:
+                queries[query]['searches'][i] = content 
+                i += 1
+            i = 0
+                
+        return queries
 
     def results_filter(self, results: list):
         
@@ -264,7 +291,15 @@ class Search:
             return f"Error fetching search results: {e}"
 
     async def to_markdown(self, html: str) -> str:
-        return md(html)
+        alphabet = "abcdefghijklmnopqrztuvwxyz"
+        markdown_content = md(html, heading_style="ATX")
+            
+        # Ensure new lines are at a max of 2 each time
+        content = '\n\n'.join([line.strip() for line in markdown_content.split('\n')
+                                if len(line.strip()) > 2 and not (line.strip().lower() in self.ignore) and not("*  *  *" in line) and any(i in {*line.lower()} for i in alphabet)])
+        
+        # Detect and remove weird patterns using regex
+        return content
 
     async def load_site(self, site: str, clean: bool = True):
         page = await self.browser.new_page()
@@ -272,13 +307,18 @@ class Search:
         if clean:
             body = await page.query_selector('body')
             html = await body.inner_html()
-            web_context = await self.to_markdown(html)
-
+            # Parse the HTML content
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # Remove footer and a tags
+            for footer in soup.find_all('footer'):
+                footer.decompose()
+            for a in soup.find_all('a'):
+                a.decompose()
+    
+            print(soup)
+            
+            web_context = await self.to_markdown(str(soup))
             return web_context
         else:
             return await page.content()
-
-    async def load_search(self, query: dict, clean: bool = True):
-        site = await self.load_site(query["link"], clean)
-        return query | {"content": site}
-
