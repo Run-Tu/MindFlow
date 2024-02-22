@@ -1,30 +1,38 @@
 from .engines import Profile, Search
 from gradio_client import Client
 import json
-import asyncio
 from litellm import completion
 from datetime import datetime
 from functools import partial
-import importlib
-import os
 
 from ..defaults import (LLM_DEFAULT, LLM_SRC,
                         CODE_DEFAULT, CODE_SRC,
                         VISION_DEFAULT, VISION_SRC)
 # omg lmao this is so bad
 
-def to_lmc(content: str, role: str = "assistant", type="message") -> dict:
-        return {"role": role, "type": type, "content": content}
+def to_lmc(content: str, role: str = "assistant", type="message", format: str | None = None) -> dict:
+    lmc = {"role": role, "type": type, "content": content} 
+    return lmc | {} if format is None else {"format": format}
     
 def to_chat(lmc: dict, logs=False) -> str:
-    _type, _role, _content = (lmc.get("type", "message"), 
-                              lmc.get("role", "assistant"), 
-                              lmc.get("content", "None"))
+    #_defaults = {}
+    
+    _type, _role, _content, _format = (lmc.get("type", "message"), 
+                                       lmc.get("role", "assistant"), 
+                                       lmc.get("content", "None"), 
+                                       lmc.get("format", None))
+    
+    # _args = lmc.keys()
+    # _args.remove("role")
+    # _args.remove("content")
+    
+    # _args = [arg + ": " + lmc.get(arg, "None") for arg in _args]
+    
     time = datetime.now().strftime("%I:%M %p %m/%d/%Y")
     
     if logs:
-        return f'\033[90m({time})\033[0m [type: {_type}] \033[1m{_role}\033[0m: {_content}'
-    return f'({time}) [type: {_type}] *{_role}*: {_content}'
+        return f'\033[90m({time})\033[0m [type: {_type if _format is None else f"{_type}, format: {_format}"}] \033[1m{_role}\033[0m: {_content}'
+    return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
     def __init__(self, api_key = Profile(), verbose=True, messages: list = []):
@@ -119,14 +127,10 @@ class LLM:
         searches = self.perform_search(needs_search['search'], needs_search.get('complexity', 1))
         results = self.browser.load_searches(searches, complexity=needs_search.get('complexity', 1))
         
-        #site_contents = self.load_sites
-        
         response = self.raw_chat(message, 
                                  role="user", 
                                  context=self.messages + [to_lmc(str(results))])
-            
-        #response = f"This needs a slightly more complex search algorithm which is in progress! {str(needs_search)}"  # TEMPORARY
-        #self.messages.append(to_lmc(response))
+
         return response
 
 

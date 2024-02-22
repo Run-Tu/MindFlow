@@ -1,10 +1,8 @@
-import atexit
 import asyncio
 import requests
 from playwright.async_api import async_playwright
 from markdownify import markdownify as md
 from bs4 import BeautifulSoup
-from ..defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
 import re
 
 from utils.google_snippets import (get_weather, 

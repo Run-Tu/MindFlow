@@ -1,10 +1,39 @@
 from .utils.engines import Search
 from .utils.computer import Computer
-from .utils.llm import LLM
+from .utils.llm import LLM, to_lmc
 from pathlib import Path
 import importlib
-import asyncio
+import json
 import os
+
+from defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
+
+class Apikey:
+    def __init__(self, key: str = "playwright", name: str = "google"):
+        self.key = key
+        self.name = name
+
+    def __str__(self):
+        return f'{self.name}: {self.key}'
+
+class Profile:
+    """
+    store apikeys here. this is temp since its a bad setup omg.
+    """
+    def __init__(
+            self, 
+            keys: dict = {"llm": LLM_DEFAULT,
+                          "code": CODE_DEFAULT,
+                          "vision": VISION_DEFAULT,
+                          "browser": "playwright"}, 
+            search_engine: str = "google",
+            name: str = None):
+        self.keys = keys
+        self.search_engine = search_engine
+        self.name = "User" if name is None else name
+
+    def __str__(self):
+        return f'Profile({self.name}, {self.keys})'
 
 class MindFlow:
     """
@@ -17,15 +46,14 @@ class MindFlow:
             history_dir: Path | None = None,
             skills_dir: Path | None = None,
             prompts_dir: Path | None = None,
+            extensions_dir: Path | None= None,
             verbose: bool = False,
             local: bool = False,
             computer = None,
-            browser = None,
             llm = None,
             tasks = False) -> None:
         
         # utils
-        self.browser = Search() if browser is None else browser
         self.computer = Computer() if computer is None else computer
         self.llm = LLM(messages=messages) if llm is None else llm
 
@@ -38,6 +66,7 @@ class MindFlow:
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
+        self.extensions_dir = Path(Path(__file__).parent, "prompts") if extensions_dir is None else extensions_dir
         
         self.llm.messages = [] if messages is None else messages
 
@@ -45,14 +74,13 @@ class MindFlow:
         self.local = local
         
         # extensions including ['browser'] by default
-        extensions = Path(Path(__path__).parent, "extensions")
-        for extension in os.listdir(extensions):
+        for extension in os.listdir(self.extensions_dir):
             module = importlib.import_module(extension)
             try:
                 name = extension.title()
                 setattr(self, name, getattr(module, name)())
             except ImportError:
-                with open(Path(extensions, extension, "config.default.toml"), "r") as f:
+                with open(Path(self.extensions_dir, extension, "config.default.toml"), "r") as f:
                     pass
 
         # prompts
@@ -62,52 +90,19 @@ class MindFlow:
             with open(Path(self.prompts_dir, filename), "r") as f:
                 self.prompts[filename.split('.')[0]] = f.read().strip()
 
-    def render_prompt(self):
-        pass
-        
-
-    def classify(self, message):
-        """
-        Classify whether the message is either a question, task or routine.
-        """
-        response = self.llm.raw_chat(message, 
-                                       context = [],
-                                       remember=False, 
-                                       system=self.prompts["classify"])
-        return response
-
     def chat(self, 
             message: str = None, 
             display: bool = True, 
-            stream: bool = False):
-    
-        mode = self.classify(message)
-        mode = mode.lower()
-        if self.verbose:
-            print('Determined conversation type:', mode)
-    
-        if mode == "chat":
-            self.run_chat(message, display)
-        elif mode == "task":
-            self.run_task(message, display)
-        elif mode == "routine":
-            self.run_routine(message, display)
-        else:
-            raise ValueError("Invalid classification of message.")
+            stream: bool = False,
+            timeout=16):
+        
+        response = json.loads(self.llm.raw_chat(message))
+        for _ in range(timeout):
+            if response.get("type", None) == "code":
+                self.llm.messages.append(to_lmc(response.get("content", None), role="computer", type="code"))
+                output = self.computer.run_python(response.get("content", None))
+                response = json.loads(self.llm.raw_chat(message=output, role="computer"))
+            else:
+                return response.get("content", None)
+        raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 
-
-    def run_chat(self, message, display):
-        response = self.llm.chat(message)
-
-        if display:
-            print("MindFlow> " + response)
-        return
-
-    def run_task(self):
-        # doing task for the first time, load `initial_task.txt`
-        if not self.tasks:
-            pass
-        pass
-
-    def run_routine(self):
-        pass
