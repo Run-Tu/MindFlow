@@ -38,11 +38,9 @@ def lazy_imports(packages: list[str | tuple[str]],
             package = (package[0], None) if len(package) == 1 else package
         else:
             package = (package, None)
-
-        if void:
-            lazy_import(*package, prefix=prefix, user_install=user_install, void=void)
-        else:
-            libs.append(lazy_import(*package, prefix=prefix, user_install=user_install))
+            
+        if (pack := lazy_import(*package, prefix=prefix, user_install=user_install, void=void)):
+            libs.append(pack)
 
     if void:
         return None

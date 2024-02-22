@@ -1,7 +1,8 @@
 from .utils.engines import Search
 from .utils.computer import Computer
-from .utils.model import Model
+from .utils.llm import LLM
 from pathlib import Path
+import importlib
 import asyncio
 import os
 
@@ -20,13 +21,13 @@ class MindFlow:
             local: bool = False,
             computer = None,
             browser = None,
-            model = None,
+            llm = None,
             tasks = False) -> None:
         
         # utils
         self.browser = Search() if browser is None else browser
         self.computer = Computer() if computer is None else computer
-        self.model = Model(messages=messages) if model is None else model
+        self.llm = LLM(messages=messages) if llm is None else llm
 
         self.tasks = tasks
 
@@ -38,10 +39,21 @@ class MindFlow:
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
         
-        self.model.messages = [] if messages is None else messages
+        self.llm.messages = [] if messages is None else messages
 
         # experimental
         self.local = local
+        
+        # extensions including ['browser'] by default
+        extensions = Path(Path(__path__).parent, "extensions")
+        for extension in os.listdir(extensions):
+            module = importlib.import_module(extension)
+            try:
+                name = extension.title()
+                setattr(self, name, getattr(module, name)())
+            except ImportError:
+                with open(Path(extensions, extension, "config.default.toml"), "r") as f:
+                    pass
 
         # prompts
         self.prompts = {}
@@ -58,7 +70,7 @@ class MindFlow:
         """
         Classify whether the message is either a question, task or routine.
         """
-        response = self.model.raw_chat(message, 
+        response = self.llm.raw_chat(message, 
                                        context = [],
                                        remember=False, 
                                        system=self.prompts["classify"])
@@ -85,7 +97,7 @@ class MindFlow:
 
 
     def run_chat(self, message, display):
-        response = self.model.chat(message)
+        response = self.llm.chat(message)
 
         if display:
             print("MindFlow> " + response)

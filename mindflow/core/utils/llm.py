@@ -1,10 +1,12 @@
-from ..utils.engines import Profile, Search
+from .engines import Profile, Search
 from gradio_client import Client
 import json
 import asyncio
 from litellm import completion
 from datetime import datetime
 from functools import partial
+import importlib
+import os
 
 from ..defaults import (LLM_DEFAULT, LLM_SRC,
                         CODE_DEFAULT, CODE_SRC,
@@ -24,12 +26,13 @@ def to_chat(lmc: dict, logs=False) -> str:
         return f'\033[90m({time})\033[0m [type: {_type}] \033[1m{_role}\033[0m: {_content}'
     return f'({time}) [type: {_type}] *{_role}*: {_content}'
 
-class Model:
-    def __init__(self, api_key = Profile(), verbose=False, messages: list = []):
+class LLM:
+    def __init__(self, api_key = Profile(), verbose=True, messages: list = []):
         self.keys = api_key.keys
 
         self.verbose = verbose
         self.messages = messages
+        
         self.browser = Search()
 
         is_llm_default = self.keys.get("llm", LLM_DEFAULT) == LLM_DEFAULT
@@ -43,10 +46,11 @@ class Model:
 
         if is_code_default: pass
         if is_vision_default: pass
+            
 
     def classify_prompt(self, prompt):
         #return {"search": [], "widget": None}
-        system = ('''Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {"search": [...], "complexity": n, "widget": widget}, note, the "..." will contain web searches you might have based on the question. Note if the user states "today" or any times (for example, 7 pm) for showtimes, do not include it in your search. minimise the amount of searches you're trying to complete. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0 and mention what Google Rich Snippet is expected from options ["weather", "events", "showtimes", "reviews"], if none set { "widget": null }. Otherwise {"search": [], "widget": null}. Do not say anything else, regardless of what the question states.''')  
+        system = ('''Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {"search": [...], "complexity": n, "widget": widget}, note, the "..." will contain web searches you might have based on the question. Note if the user states "today" or any times (for example, 7 pm) for showtimes, do not include it in your search. minimise the amount of searches you're trying to complete. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0 and mention what Google Rich Snippet is expected from. **NOTE** implemented snippets at the moment is limited to ["weather", "events", "showtimes", "reviews"], if none set { "widget": null }. Otherwise {"search": [], "widget": null}. Do not say anything else, regardless of what the question states.''')  
         classification = self.raw_chat(prompt, 
                                        remember=False, 
                                        system=system)
