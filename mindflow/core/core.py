@@ -1,4 +1,3 @@
-from .utils.engines import Search
 from .utils.computer import Computer
 from .utils.llm import LLM, to_lmc
 from pathlib import Path
@@ -6,7 +5,7 @@ import importlib
 import json
 import os
 
-from defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
+from .defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
 
 class Apikey:
     def __init__(self, key: str = "playwright", name: str = "google"):
@@ -55,7 +54,7 @@ class MindFlow:
         
         # utils
         self.computer = Computer() if computer is None else computer
-        self.llm = LLM(messages=messages) if llm is None else llm
+        self.llm = LLM(Profile(), messages=messages) if llm is None else llm
 
         self.tasks = tasks
 
@@ -66,7 +65,7 @@ class MindFlow:
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
-        self.extensions_dir = Path(Path(__file__).parent, "prompts") if extensions_dir is None else extensions_dir
+        self.extensions_dir = Path(Path(__file__).parent.parent, "extensions") if extensions_dir is None else extensions_dir
         
         self.llm.messages = [] if messages is None else messages
 
@@ -75,13 +74,18 @@ class MindFlow:
         
         # extensions including ['browser'] by default
         for extension in os.listdir(self.extensions_dir):
-            module = importlib.import_module(extension)
-            try:
-                name = extension.title()
-                setattr(self, name, getattr(module, name)())
-            except ImportError:
-                with open(Path(self.extensions_dir, extension, "config.default.toml"), "r") as f:
-                    pass
+            module_path = os.path.join(self.extensions_dir, extension)
+            if os.path.isdir(module_path) and '__init__.py' in os.listdir(module_path):
+                try:
+                    module = importlib.import_module(extension)
+                    name = extension.title()
+                    setattr(self, name, getattr(module, name)())
+                except ImportError:
+                    config_path = Path(self.extensions_dir, extension, "config.default.toml")
+                    if config_path.exists():
+                        with open(config_path, "r") as f:
+                            # Handle the config file as needed
+                            pass
 
         # prompts
         self.prompts = {}
@@ -96,13 +100,20 @@ class MindFlow:
             stream: bool = False,
             timeout=16):
         
-        response = json.loads(self.llm.raw_chat(message))
+        response = json.loads(self.llm.raw_chat(message, system=self.prompts["initial"]))
         for _ in range(timeout):
+            if response == "The task is done.":
+                return
+            
             if response.get("type", None) == "code":
-                self.llm.messages.append(to_lmc(response.get("content", None), role="computer", type="code"))
+                #self.llm.messages.append(to_lmc(response.get("content", None), role="computer", type="code"))
                 output = self.computer.run_python(response.get("content", None))
-                response = json.loads(self.llm.raw_chat(message=output, role="computer"))
+                self.llm.messages.append(to_lmc(output, role="computer", type="code", format="output"))
+                
+                
+                response = json.loads(self.llm.raw_chat(message=output, role="computer", system=self.prompts["initial"]))
             else:
                 return response.get("content", None)
+            
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 

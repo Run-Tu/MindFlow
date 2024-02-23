@@ -1,4 +1,3 @@
-from .engines import Profile, Search
 from gradio_client import Client
 import json
 from litellm import completion
@@ -11,8 +10,17 @@ from ..defaults import (LLM_DEFAULT, LLM_SRC,
 # omg lmao this is so bad
 
 def to_lmc(content: str, role: str = "assistant", type="message", format: str | None = None) -> dict:
+    if role == "assistant":                  
+        try:
+            response = json.loads(response)
+            format = response.get("format", None)
+            lmc = {"role": role, "type": response.get("type", "message"), "content": response.get("content", "None")} 
+            return lmc | ({} if format is None else {"format": format})
+        except:
+            pass
+            
     lmc = {"role": role, "type": type, "content": content} 
-    return lmc | {} if format is None else {"format": format}
+    return lmc | ({} if format is None else {"format": format})
     
 def to_chat(lmc: dict, logs=False) -> str:
     #_defaults = {}
@@ -35,13 +43,11 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, api_key = Profile(), verbose=True, messages: list = []):
+    def __init__(self, api_key, verbose=True, messages: list = []):
         self.keys = api_key.keys
 
         self.verbose = verbose
         self.messages = messages
-        
-        self.browser = Search()
 
         is_llm_default = self.keys.get("llm", LLM_DEFAULT) == LLM_DEFAULT
         is_code_default = self.keys.get("code", CODE_DEFAULT) == CODE_DEFAULT

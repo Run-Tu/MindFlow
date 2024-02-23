@@ -7,4 +7,13 @@ class Computer:
         pass
     
     def run_python(self, code):
-        return eval(code)
+        output = io.StringIO()
+        stdout = sys.stdout
+        sys.stdout = output
+        
+        try:
+            exec(code)
+        finally:
+            sys.stdout = stdout
+        
+        return output.getvalue()
