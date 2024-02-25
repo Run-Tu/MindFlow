@@ -100,18 +100,18 @@ class MindFlow:
             stream: bool = False,
             timeout=16):
         
-        response = json.loads(self.llm.raw_chat(message, system=self.prompts["initial"]))
+        response = self.llm.raw_chat(message, system=self.prompts["initial"])
         for _ in range(timeout):
             if response == "The task is done.":
                 return
             
             if response.get("type", None) == "code":
                 #self.llm.messages.append(to_lmc(response.get("content", None), role="computer", type="code"))
-                output = self.computer.run_python(response.get("content", None))
-                self.llm.messages.append(to_lmc(output, role="computer", type="code", format="output"))
+                output = to_lmc(self.computer.run_python(response.get("content", None)),
+                                role="computer", format="output")
                 
                 
-                response = json.loads(self.llm.raw_chat(message=output, role="computer", system=self.prompts["initial"]))
+                response = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
             else:
                 return response.get("content", None)
             

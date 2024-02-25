@@ -9,16 +9,26 @@ from ..defaults import (LLM_DEFAULT, LLM_SRC,
                         VISION_DEFAULT, VISION_SRC)
 # omg lmao this is so bad
 
-def to_lmc(content: str, role: str = "assistant", type="message", format: str | None = None) -> dict:
-    if role == "assistant":                  
-        try:
-            response = json.loads(response)
-            format = response.get("format", None)
-            lmc = {"role": role, "type": response.get("type", "message"), "content": response.get("content", "None")} 
-            return lmc | ({} if format is None else {"format": format})
-        except:
-            pass
-            
+import re
+
+def interpret_input(input_str):
+    # Define the regex pattern
+    pattern = r'\[type:\s*(?P<type>\w+)(?:,\s*format:\s*(?P<format>\w+))?\]\s*(?P<content>[\s\S]+)'
+
+    # Match the pattern with the input string
+    match = re.match(pattern, input_str)
+
+    if match:
+        # Extract the matched groups into a dictionary
+        result = match.groupdict()
+        # Remove the 'format' key if it's None
+        if result['format'] is None:
+            del result['format']
+        return result
+    else:
+        return None
+
+def to_lmc(content: str, role: str = "assistant", type="message", format: str | None = None) -> dict:            
     lmc = {"role": role, "type": type, "content": content} 
     return lmc | ({} if format is None else {"format": format})
     
@@ -83,23 +93,29 @@ class LLM:
                     role = "user", 
                     remember=True, 
                     context=True,
+                    lmc=False,
                     system: str = 'You are a helpful assistant.'):
         
         system = to_lmc(system, role="system")
-        message = to_lmc(message, role=role)
+        message = message if lmc else to_lmc(message, role=role)
         
         to_send = [system] + (self.messages if context is True else context) + [message]
         
         if remember:
             self.messages.append(message)
             
-        response = self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict")
+        response = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
+        
         
         if remember:
-            self.messages.append(to_lmc(response))
+            self.messages.append(to_lmc(response.get("content", "None"), 
+                                        format=response.get("format", None),
+                                        type=response.get("type", "message")))
             
         if self.verbose:
-            print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send + [to_lmc(response)])))
+            print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send + [to_lmc(response.get("content", "None"), 
+                                        format=response.get("format", None),
+                                        type=response.get("type", "message"))])))
         return response
         
 

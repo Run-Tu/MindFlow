@@ -15,5 +15,7 @@ class Computer:
             exec(code)
         finally:
             sys.stdout = stdout
+            
+        output = output.getvalue()
         
-        return output.getvalue()
+        return output if output else "The following code did not generate any output"
