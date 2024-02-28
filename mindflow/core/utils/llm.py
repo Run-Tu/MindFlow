@@ -12,21 +12,26 @@ from ..defaults import (LLM_DEFAULT, LLM_SRC,
 import re
 
 def interpret_input(input_str):
-    # Define the regex pattern
-    pattern = r'\[type:\s*(?P<type>\w+)(?:,\s*format:\s*(?P<format>\w+))?\]\s*(?P<content>[\s\S]+)'
-
-    # Match the pattern with the input string
-    match = re.match(pattern, input_str)
-
-    if match:
-        # Extract the matched groups into a dictionary
-        result = match.groupdict()
-        # Remove the 'format' key if it's None
-        if result['format'] is None:
-            del result['format']
-        return result
-    else:
-        return None
+    pattern = r'```(?P<format>\w+)\n(?P<content>[\s\S]+?)```|(?P<text>[^\n]+)'
+    
+    matches = re.finditer(pattern, input_str)
+    
+    blocks = []
+    for match in matches:
+        if match.group("format"):
+            block = {
+                "type": "code",
+                "format": match.group("format"),
+                "content": match.group("content").strip()
+            }
+        else:
+            block = {
+                "type": "message",
+                "content": match.group("text").strip()
+            }
+        blocks.append(block)
+    
+    return blocks
 
 def to_lmc(content: str, role: str = "assistant", type="message", format: str | None = None) -> dict:            
     lmc = {"role": role, "type": type, "content": content} 
@@ -53,7 +58,7 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, api_key, verbose=True, messages: list = []):
+    def __init__(self, api_key, verbose=False, messages: list = []):
         self.keys = api_key.keys
 
         self.verbose = verbose
@@ -104,19 +109,19 @@ class LLM:
         if remember:
             self.messages.append(message)
             
-        response = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
-        
-        
-        if remember:
-            self.messages.append(to_lmc(response.get("content", "None"), 
-                                        format=response.get("format", None),
-                                        type=response.get("type", "message")))
-            
         if self.verbose:
-            print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send + [to_lmc(response.get("content", "None"), 
-                                        format=response.get("format", None),
-                                        type=response.get("type", "message"))])))
-        return response
+            print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send)))
+            
+        responses = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
+        
+        for response in responses:
+            if remember:
+                self.messages.append(response | {"role": "assistant"})
+                
+            if self.verbose:
+                print(to_chat(response | {"role": "assistant"}, logs=True))
+
+        return responses
         
 
     async def litellm_chat(self, message: str, remember=True):

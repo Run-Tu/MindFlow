@@ -1,8 +1,8 @@
 from .utils.computer import Computer
-from .utils.llm import LLM, to_lmc
+from .utils.llm import LLM, to_lmc, to_chat
+from functools import partial
 from pathlib import Path
 import importlib
-import json
 import os
 
 from .defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
@@ -100,20 +100,20 @@ class MindFlow:
             stream: bool = False,
             timeout=16):
         
-        response = self.llm.raw_chat(message, system=self.prompts["initial"])
-        for _ in range(timeout):
-            if response == "The task is done.":
-                return
+        responses = self.llm.raw_chat(message, system=self.prompts["initial"])
+        messages = []
+        for response in responses: 
+            if response.get("type", None) == "message":
+                messages.append(response)
             
             if response.get("type", None) == "code":
-                #self.llm.messages.append(to_lmc(response.get("content", None), role="computer", type="code"))
                 output = to_lmc(self.computer.run_python(response.get("content", None)),
                                 role="computer", format="output")
-                
-                
                 response = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
-            else:
-                return response.get("content", None)
-            
-        raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
+        
+        #return messages
+        # temp
+        print('\n'.join(map(partial(to_chat, logs=True), messages)))
+        # will add a 'stream of thought' system to allow the bot to debug on its own and prompt itself  
+        # raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 

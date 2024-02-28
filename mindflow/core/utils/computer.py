@@ -9,12 +9,18 @@ class Computer:
     def run_python(self, code):
         output = io.StringIO()
         stdout = sys.stdout
-        sys.stdout = output
+        lines = code.splitlines()
+        print('\n' + '\n'.join([f'{" "*(len(str(len(lines))) - len(str(i+1)))}{i+1} | {line}' for i, line in enumerate(lines)]) + '\n')
         
-        try:
-            exec(code)
-        finally:
-            sys.stdout = stdout
+        sys.stdout = output
+        exec(code)
+        sys.stdout = stdout
+
+        # try:
+        #     print('\n' * 10 + '\n'.join([f'{i} | {line}' for i, line in enumerate(code.splitlines())]) + '\n' * 10)
+        #     exec(code)
+        # finally:
+        #     sys.stdout = stdout
             
         output = output.getvalue()
         
