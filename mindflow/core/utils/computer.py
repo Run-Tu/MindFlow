@@ -13,7 +13,7 @@ class Computer:
         print('\n' + '\n'.join([f'{" "*(len(str(len(lines))) - len(str(i+1)))}{i+1} | {line}' for i, line in enumerate(lines)]) + '\n')
         
         sys.stdout = output
-        exec(code)
+        exec(code, {})
         sys.stdout = stdout
 
         # try:
