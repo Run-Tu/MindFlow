@@ -101,19 +101,22 @@ class MindFlow:
             timeout=16):
         
         responses = self.llm.raw_chat(message, system=self.prompts["initial"])
-        messages = []
+        # for _ in range(timeout):
         for response in responses: 
             if response.get("type", None) == "message":
-                messages.append(response)
+                print(to_chat(response, logs=True))
             
             if response.get("type", None) == "code":
-                output = to_lmc(self.computer.run_python(response.get("content", None)),
+                output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
                                 role="computer", format="output")
-                response = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
+                print(to_chat(output, logs=True))
+                responses_ = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
+                print("\n".join(map(partial(to_chat, logs=True), responses_)))
+            
+            # responses = self.llm.raw_chat(message, system=self.prompts["initial"])
         
         #return messages
         # temp
-        print('\n'.join(map(partial(to_chat, logs=True), messages)))
         # will add a 'stream of thought' system to allow the bot to debug on its own and prompt itself  
         # raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 

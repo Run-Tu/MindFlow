@@ -17,19 +17,31 @@ def interpret_input(input_str):
     matches = re.finditer(pattern, input_str)
     
     blocks = []
+    current_message = None
+    
     for match in matches:
         if match.group("format"):
+            if current_message:
+                blocks.append(current_message)
+                current_message = None
             block = {
                 "type": "code",
                 "format": match.group("format"),
                 "content": match.group("content").strip()
             }
+            blocks.append(block)
         else:
-            block = {
-                "type": "message",
-                "content": match.group("text").strip()
-            }
-        blocks.append(block)
+            text = match.group("text").strip()
+            if current_message:
+                current_message["content"] += "\n" + text
+            else:
+                current_message = {
+                    "type": "message",
+                    "content": text
+                }
+    
+    if current_message:
+        blocks.append(current_message)
     
     return blocks
 
