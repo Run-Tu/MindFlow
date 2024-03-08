@@ -2,6 +2,8 @@ import io
 import sys
 import subprocess
 import platform
+from rich.console import Console
+from rich.syntax import Syntax
 
 class Computer:
     def __init__(self) -> None:
@@ -9,8 +11,13 @@ class Computer:
         
     def run(self, code, format='python'):
         lines = code.splitlines()
-        print(f'Running `{format}`...')
-        print('\n' + '\n'.join([f'{str(i+1).rjust(len(str(len(lines))))} | {line}' for i, line in enumerate(lines)]) + '\n')
+        
+        console = Console()
+        syntax = Syntax(code, format, theme="github-dark", line_numbers=True)
+        
+        console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
+        console.print(syntax)
+        print()
         
         output = ""
         
@@ -25,7 +32,7 @@ class Computer:
         else:
             output = f"MindFlow does not support the format: {format}"
         
-        return output if output else "The following code did not generate any output"
+        return output if output else "The following code did not generate any console text output, but may generate other output."
  
 
     def run_python(self, code):

@@ -101,17 +101,20 @@ class MindFlow:
             timeout=16):
         
         responses = self.llm.raw_chat(message, system=self.prompts["initial"])
+        responses_ = []
         # for _ in range(timeout):
         for response in responses: 
             if response.get("type", None) == "message":
-                print(to_chat(response, logs=True))
+                yield response
             
             if response.get("type", None) == "code":
                 output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
                                 role="computer", format="output")
-                print(to_chat(output, logs=True))
+                yield output
                 responses_ = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
-                print("\n".join(map(partial(to_chat, logs=True), responses_)))
+                
+        for response_ in responses_:
+            yield response_
             
             # responses = self.llm.raw_chat(message, system=self.prompts["initial"])
         
