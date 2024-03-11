@@ -1,9 +1,9 @@
 from .utils.computer import Computer
-from .utils.llm import LLM, to_lmc, to_chat
-from functools import partial
+from .utils.llm import LLM, to_lmc
 from pathlib import Path
 import importlib
 import os
+import toml
 
 from .defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
 
@@ -71,6 +71,8 @@ class MindFlow:
 
         # experimental
         self.local = local
+        with open(Path(Path(__file__).parent, "config.default.toml"), "r") as file:
+            self.settings = toml.load(file)
         
         # extensions including ['browser'] by default
         for extension in os.listdir(self.extensions_dir):
@@ -93,6 +95,10 @@ class MindFlow:
         for filename in prompts:
             with open(Path(self.prompts_dir, filename), "r") as f:
                 self.prompts[filename.split('.')[0]] = f.read().strip()
+                
+        self.prompts['initial'] = self.prompts['initial'].format(assistant=self.settings['assistant']['name'],
+                                                                 username=self.computer.user,
+                                                                 os=self.computer.os)
 
     def chat(self, 
             message: str = None, 

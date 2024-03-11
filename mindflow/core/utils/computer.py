@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 import subprocess
 import platform
@@ -7,11 +8,11 @@ from rich.syntax import Syntax
 
 class Computer:
     def __init__(self) -> None:
-        pass
+        self.platform = platform.uname()
+        self.user = os.getlogin()
+        self.os = f"{self.platform.system} {self.platform.version}"
         
     def run(self, code, format='python'):
-        lines = code.splitlines()
-        
         console = Console()
         syntax = Syntax(code, format, theme="github-dark", line_numbers=True)
         
