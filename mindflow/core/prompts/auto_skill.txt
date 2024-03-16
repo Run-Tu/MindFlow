@@ -1,1 +1,0 @@
-If you believe this task might be useful for future cases, for example messaging or emails, then explicitly execute: "computer.save_skill()"

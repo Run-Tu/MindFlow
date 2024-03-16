@@ -106,7 +106,7 @@ class MindFlow:
             stream: bool = False,
             timeout=16):
         
-        responses = self.llm.raw_chat(message, system=self.prompts["initial"])
+        responses = self.llm.chat(message, system=self.prompts["initial"])
         responses_ = []
         # for _ in range(timeout):
         for response in responses: 
@@ -117,12 +117,12 @@ class MindFlow:
                 output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
                                 role="computer", format="output")
                 yield output
-                responses_ = self.llm.raw_chat(message=output, lmc=True, system=self.prompts["initial"])
+                responses_ = self.llm.chat(message=output, lmc=True, system=self.prompts["initial"])
                 
         for response_ in responses_:
             yield response_
             
-            # responses = self.llm.raw_chat(message, system=self.prompts["initial"])
+            # responses = self.llm.chat(message, system=self.prompts["initial"])
         
         #return messages
         # temp
