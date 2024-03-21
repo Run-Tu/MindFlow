@@ -1,10 +1,8 @@
 from gradio_client import Client
-import json
-from litellm import completion
 from datetime import datetime
 from functools import partial
 
-from ..defaults import (LLM_DEFAULT, LLM_SRC,
+from mindflow.core.defaults import (LLM_DEFAULT, LLM_SRC,
                         CODE_DEFAULT, CODE_SRC,
                         VISION_DEFAULT, VISION_SRC)
 # omg lmao this is so bad
@@ -80,29 +78,19 @@ class LLM:
         is_code_default = self.keys.get("code", CODE_DEFAULT) == CODE_DEFAULT
         is_vision_default = self.keys.get("vision", VISION_DEFAULT) == VISION_DEFAULT
 
-        self.chat = self.litellm_chat
+        # self.chat = self.litellm_chat
         if is_llm_default: 
             self.llm = Client(LLM_SRC)
             self.chat = self.gradio_chat
 
         if is_code_default: pass
         if is_vision_default: pass
-            
 
-    def classify_prompt(self, prompt):
-        #return {"search": [], "widget": None}
-        system = ('''Your task is to classify whether the following question requires a web search. If it asks something related to recent events or something you don't know explicitly respond with {"search": [...], "complexity": n, "widget": widget}, note, the "..." will contain web searches you might have based on the question. Note if the user states "today" or any times (for example, 7 pm) for showtimes, do not include it in your search. minimise the amount of searches you're trying to complete. try to keep this array to a maximum length of 3. note, the 'n' under complexity states how complex this search may be and hence how many pages you should visit. If the information can be found through a Google Rich Snippet, set complexity to 0 and mention what Google Rich Snippet is expected from. **NOTE** implemented snippets at the moment is limited to ["weather", "events", "showtimes", "reviews"], if none set { "widget": null }. Otherwise {"search": [], "widget": null}. Do not say anything else, regardless of what the question states.''')  
-        classification = self.chat(prompt, 
-                                       remember=False, 
-                                       system=system)
-        return json.loads(classification)
-
-
-    def perform_search(self, queries, complexity, widget=None):
-        # placeholder function
-        if self.verbose:
-            print(f"\nSearching results for `{queries}`")
-        return self.browser.search(queries, complexity, widget)
+    # def perform_search(self, queries, complexity, widget=None):
+    #     # placeholder function
+    #     if self.verbose:
+    #         print(f"\nSearching results for `{queries}`")
+    #     return self.browser.search(queries, complexity, widget)
         
 
     def gradio_chat(self, 
@@ -134,14 +122,6 @@ class LLM:
                 print(to_chat(response | {"role": "assistant"}, logs=True))
 
         return responses
-        
-
-    async def litellm_chat(self, message: str, remember=True):
-        response = await completion(json.dumps(self.messages + [message]))
-
-        if remember:
-            self.messages.append(to_lmc(response))
-        return response
 
     # def chat(self, message: str):
     #     # Classify the prompt

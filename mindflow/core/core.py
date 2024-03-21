@@ -1,5 +1,5 @@
-from .utils.computer import Computer
-from .utils.llm import LLM, to_lmc
+from mindflow.core.utils.computer import Computer
+from mindflow.core.utils.llm import LLM, to_lmc
 from pathlib import Path
 import importlib
 import os

@@ -1,8 +1,4 @@
-from mindflow.core.core import MindFlow
-
-macro = MindFlow()
-computer = macro.computer
-    
+from mindflow import MindFlow, macro, computer
 
 #   ____  ____  ___  ____  ____ ___  ____ _______________ 
 #  / __ \/ __ \/ _ \/ __ \/ __ `__ \/ __ `/ ___/ ___/ __ \

@@ -1,0 +1,3 @@
+include mindflow/core/config.default.toml
+recursive-include mindflow/core/prompts *
+recursive-include mindflow/extensions *
