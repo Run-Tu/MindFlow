@@ -1,7 +1,6 @@
 import io
 import os
 import sys
-import subprocess
 import platform
 from rich.console import Console
 from rich.syntax import Syntax
@@ -50,26 +49,21 @@ class Computer:
 
     def run_shell(self, code):
         try:
-            result = subprocess.run(code, shell=True, capture_output=True, text=True)
-            return result.stdout if result.stdout else result.stderr
+            result = os.system(code)
+            return f"Command executed with exit code: {result}"
         except Exception as e:
             return f"An error occurred: {e}"
 
     def run_applescript(self, code):
         try:
-            result = subprocess.run(['osascript', '-e', code], capture_output=True, text=True)
-            return result.stdout if result.stdout else result.stderr
+            result = os.system(f'osascript -e "{code}"')
+            return f"Command executed with exit code: {result}"
         except Exception as e:
             return f"An error occurred: {e}"
 
     def run_js(self, code):
-        # try:
-        #     subprocess.run(['node', '--version'], capture_output=True, text=True, check=True)
-        # except subprocess.CalledProcessError:
-        #     return "Node.js is not installed. Please install Node.js to run JavaScript code."
-        
         try:
-            result = subprocess.run(['node', '-e', code], capture_output=True, text=True)
-            return result.stdout if result.stdout else result.stderr
+            result = os.system(f'node -e "{code}"')
+            return f"Command executed with exit code: {result}"
         except Exception as e:
             return f"An error occurred: {e}"
