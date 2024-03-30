@@ -1,4 +1,4 @@
-from gradio_client import Client
+from gradio_client import Client, exceptions
 from datetime import datetime
 from functools import partial
 
@@ -55,16 +55,15 @@ def to_chat(lmc: dict, logs=False) -> str:
                                        lmc.get("content", "None"), 
                                        lmc.get("format", None))
     
-    # _args = lmc.keys()
-    # _args.remove("role")
-    # _args.remove("content")
-    
-    # _args = [arg + ": " + lmc.get(arg, "None") for arg in _args]
-    
     time = datetime.now().strftime("%I:%M %p %m/%d/%Y")
     
     if logs:
         return f'\033[90m({time})\033[0m [type: {_type if _format is None else f"{_type}, format: {_format}"}] \033[1m{_role}\033[0m: {_content}'
+    
+    if _role == "system":
+        return ("----- SYSTEM PROMPT -----\n" +
+                _content + "\n----- END SYSTEM PROMPT -----")
+    
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
@@ -104,15 +103,19 @@ class LLM:
         system = to_lmc(system, role="system")
         message = message if lmc else to_lmc(message, role=role)
         
-        to_send = [system] + (self.messages if context is True else context) + [message]
+        to_send = (self.messages if context is True else context) + [system] + [message]
         
         if remember:
             self.messages.append(message)
             
         if self.verbose:
             print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send)))
-            
-        responses = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
+        
+        try:
+            responses = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
+        except exceptions.AppError as e:
+            print(f"gradio_client.exceptions.AppError({e})")
+            exit()
         
         for response in responses:
             if remember:

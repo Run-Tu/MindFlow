@@ -1,1 +1,3 @@
-from cli import main 
+from mindflow.cli import main
+
+main()

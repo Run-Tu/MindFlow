@@ -15,6 +15,12 @@ class Computer:
         console = Console()
         syntax = Syntax(code, format, theme="github-dark", line_numbers=True)
         
+        if format == 'pseudocode':
+            console.print(f'[bold #4a4e54]{chr(0x1F785)} Task plan in `{format}`...[/bold #4a4e54]')
+            console.print(syntax)
+            print()
+            return None
+
         console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
         console.print(syntax)
         print()
@@ -29,6 +35,8 @@ class Computer:
             output = self.run_applescript(code)
         elif format == 'js':
             output = self.run_js(code)
+        elif format == 'powershell':
+            output = self.run_powershell(code)
         else:
             output = f"MindFlow does not support the format: {format}"
         
@@ -64,6 +72,13 @@ class Computer:
     def run_js(self, code):
         try:
             result = os.system(f'node -e "{code}"')
+            return f"Command executed with exit code: {result}"
+        except Exception as e:
+            return f"An error occurred: {e}"
+        
+    def run_powershell(self, code):
+        try:
+            result = os.system(f'powershell -Command "{code}"')
             return f"Command executed with exit code: {result}"
         except Exception as e:
             return f"An error occurred: {e}"

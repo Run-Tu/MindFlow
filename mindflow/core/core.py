@@ -61,6 +61,9 @@ class MindFlow:
         # logging + debugging
         self.verbose = verbose
         
+        # loop breakers
+        self.breakers = frozenset({"The task is done.", "The conversation is done."})
+        
         # memory + history
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
@@ -106,26 +109,26 @@ class MindFlow:
             stream: bool = False,
             timeout=16):
         
-        responses = self.llm.chat(message, system=self.prompts["initial"])
-        responses_ = []
-        # for _ in range(timeout):
-        for response in responses: 
-            if response.get("type", None) == "message":
-                yield response
+        lmc, conversation = False, set()
+        for _ in range(timeout):
+            responses = self.llm.chat(message, system=self.prompts["initial"], lmc=lmc)
+            lmc = False
             
-            if response.get("type", None) == "code":
-                output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
-                                role="computer", format="output")
-                yield output
-                responses_ = self.llm.chat(message=output, lmc=True, system=self.prompts["initial"])
+            for response in responses: 
+                if response.get("type", None) == "message":
+                    conversation.add("message")
+                    yield response
                 
-        for response_ in responses_:
-            yield response_
-            
-            # responses = self.llm.chat(message, system=self.prompts["initial"])
-        
-        #return messages
-        # temp
-        # will add a 'stream of thought' system to allow the bot to debug on its own and prompt itself  
-        # raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
+                if response.get("type", None) == "code":
+                    output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
+                                    role="computer", format="output")
+                    if output.get("content", None):
+                        yield output
+                        message, lmc = output, True
+                    conversation.add("code")
+                    
+            if not ("code" in conversation) or response.get("content", None) in self.breakers:
+                return # "The task is done."
+                    
+        raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 
