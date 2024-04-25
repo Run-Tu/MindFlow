@@ -1,11 +1,7 @@
+from ...core.utils.general import load_settings
 from gradio_client import Client, exceptions
 from datetime import datetime
 from functools import partial
-
-from mindflow.core.defaults import (LLM_DEFAULT, LLM_SRC,
-                        CODE_DEFAULT, CODE_SRC,
-                        VISION_DEFAULT, VISION_SRC)
-# omg lmao this is so bad
 
 import re
 
@@ -67,30 +63,30 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, api_key, verbose=False, messages: list = []):
-        self.keys = api_key.keys
+    def __init__(self, profile, verbose=False, messages: list = []):
+        self.settings = profile.settings
+        self.keys = profile.keys
 
         self.verbose = verbose
         self.messages = messages
-
-        is_llm_default = self.keys.get("llm", LLM_DEFAULT) == LLM_DEFAULT
-        is_code_default = self.keys.get("code", CODE_DEFAULT) == CODE_DEFAULT
-        is_vision_default = self.keys.get("vision", VISION_DEFAULT) == VISION_DEFAULT
+        
+        self.is_llm_default = self.keys["llm"] == self.settings["defaults"]["llm"]
+        self.is_code_default = self.keys["code"] == self.settings["defaults"]["code"]
+        self.is_vision_default = self.keys["vision"] == self.settings["defaults"]["vision"]
 
         # self.chat = self.litellm_chat
-        if is_llm_default: 
-            self.llm = Client(LLM_SRC)
+        for key in tuple(self.keys)[:-1]:
+            if getattr(self, f"is_{key}_default"): # yes, im lazy :D
+                setattr(self, key, Client(self.settings["defaults"]["src"][key]))
+                
+        if self.is_llm_default:
             self.chat = self.gradio_chat
-
-        if is_code_default: pass
-        if is_vision_default: pass
 
     # def perform_search(self, queries, complexity, widget=None):
     #     # placeholder function
     #     if self.verbose:
     #         print(f"\nSearching results for `{queries}`")
     #     return self.browser.search(queries, complexity, widget)
-        
 
     def gradio_chat(self, 
                     message: str, 

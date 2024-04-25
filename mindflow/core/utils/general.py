@@ -1,5 +1,9 @@
 import subprocess
 import importlib.util
+import toml
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 def is_installed(package):
     spec = importlib.util.find_spec(package)
@@ -46,3 +50,20 @@ def lazy_imports(packages: list[str | tuple[str]],
         return None
     
     return tuple(libs)
+
+def load_settings(settings=None, section=None, verbose=False):
+    if settings is None:
+        
+        config = Path(ROOT_DIR, "config.toml")
+        config_default = Path(ROOT_DIR, "config.default.toml")
+        
+        with open(config_default, "r") as file:
+            settings = toml.load(file)
+        
+        if config.is_file():
+            with open(config, "r") as file:
+                settings |= toml.load(file)
+        elif verbose:
+            print("config.toml not found, using config.defaults.toml instead!")
+
+    return settings.get(section, settings) if section else settings

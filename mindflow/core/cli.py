@@ -1,4 +1,4 @@
-from mindflow import macro
+from .core import MindFlow
 from rich.console import Console
 from rich.markdown import Markdown
 from datetime import datetime
@@ -12,7 +12,7 @@ def to_chat(lmc: dict) -> str:
     time = datetime.now().strftime("%I:%M %p %d/%m/%Y")
     return (f"[bold #4a4e54]{chr(0x1F785)} ({time})[/bold #4a4e54] [italic bold]{_role}[/italic bold]", Markdown(_content))
 
-def main():
+def main(macro):
     console = Console()
     while True:
         query = input('~ ') or "plot an exponential graph"
@@ -21,6 +21,3 @@ def main():
             console.print(author)
             console.print(content)
             print()
-            
-if __name__ == "__main__":
-    main()

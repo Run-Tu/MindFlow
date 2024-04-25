@@ -1,3 +1,5 @@
-from mindflow.cli import main
+from .core.cli import main
+from . import macro
 
-main()
+if __name__ == "__main__":
+    main(macro)

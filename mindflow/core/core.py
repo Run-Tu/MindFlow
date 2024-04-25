@@ -1,38 +1,25 @@
-from mindflow.core.utils.computer import Computer
-from mindflow.core.utils.llm import LLM, to_lmc
+from ..core.utils.computer import Computer
+from ..core.utils.llm import LLM, to_lmc
+from ..core.utils.general import load_settings
 from pathlib import Path
 import importlib
 import os
 import toml
 
-from .defaults import (LLM_DEFAULT, CODE_DEFAULT, VISION_DEFAULT)
-
-class Apikey:
-    def __init__(self, key: str = "playwright", name: str = "google"):
-        self.key = key
-        self.name = name
-
-    def __str__(self):
-        return f'{self.name}: {self.key}'
-
 class Profile:
     """
     store apikeys here. this is temp since its a bad setup omg.
     """
-    def __init__(
-            self, 
-            keys: dict = {"llm": LLM_DEFAULT,
-                          "code": CODE_DEFAULT,
-                          "vision": VISION_DEFAULT,
-                          "browser": "playwright"}, 
-            search_engine: str = "google",
-            name: str = None):
+    def __init__(self, keys: dict ={}):
+        
+        self.settings = load_settings()
         self.keys = keys
-        self.search_engine = search_engine
-        self.name = "User" if name is None else name
-
+        if not keys:
+            self.keys = load_settings(self.settings, section="defaults")
+            
+            
     def __str__(self):
-        return f'Profile({self.name}, {self.keys})'
+        return f'Profile({self.keys})'
 
 class MindFlow:
     """
@@ -50,19 +37,23 @@ class MindFlow:
             local: bool = False,
             computer = None,
             llm = None,
-            tasks = False) -> None:
+            tasks = False,
+            breakers = frozenset({"The task is done.", "The conversation is done."})) -> None:
+        
+        # settings
+        self.profile = Profile()
+        self.settings = self.profile.settings
         
         # utils
         self.computer = Computer() if computer is None else computer
-        self.llm = LLM(Profile(), messages=messages) if llm is None else llm
-
+        self.llm = LLM(self.profile, messages=messages) if llm is None else llm
         self.tasks = tasks
 
         # logging + debugging
         self.verbose = verbose
         
         # loop breakers
-        self.breakers = frozenset({"The task is done.", "The conversation is done."})
+        self.breakers = breakers
         
         # memory + history
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
@@ -74,8 +65,6 @@ class MindFlow:
 
         # experimental
         self.local = local
-        with open(Path(Path(__file__).parent, "config.default.toml"), "r") as file:
-            self.settings = toml.load(file)
         
         # extensions including ['browser'] by default
         for extension in os.listdir(self.extensions_dir):
