@@ -99,7 +99,7 @@ class LLM:
         system = to_lmc(system, role="system")
         message = message if lmc else to_lmc(message, role=role)
         
-        to_send = (self.messages if context is True else context) + [system] + [message]
+        to_send = (self.messages if context is True else context) + [message]
         
         if remember:
             self.messages.append(message)
@@ -108,7 +108,9 @@ class LLM:
             print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send)))
         
         try:
-            responses = interpret_input(self.llm.predict(user_message='\n'.join(map(to_chat, to_send)), api_name="/predict"))
+            responses = interpret_input(self.llm.predict(message='\n'.join(map(to_chat, to_send)),
+                                                         system_message=to_chat(system), 
+                                                         api_name="/chat"))
         except exceptions.AppError as e:
             print(f"gradio_client.exceptions.AppError({e})")
             exit()

@@ -15,7 +15,7 @@ class Profile:
         self.settings = load_settings()
         self.keys = keys
         if not keys:
-            self.keys = load_settings(self.settings, section="defaults")
+            self.keys = self.settings["defaults"]
             
             
     def __str__(self):
@@ -38,7 +38,7 @@ class MindFlow:
             computer = None,
             llm = None,
             tasks = False,
-            breakers = frozenset({"The task is done.", "The conversation is done."})) -> None:
+            breakers = tuple("The task is done.", "The conversation is done.")) -> None:
         
         # settings
         self.profile = Profile()
@@ -89,6 +89,7 @@ class MindFlow:
                 self.prompts[filename.split('.')[0]] = f.read().strip()
                 
         self.prompts['initial'] = self.prompts['initial'].format(assistant=self.settings['assistant']['name'],
+                                                                 personality=self.settings['assistant']['personality'],
                                                                  username=self.computer.user,
                                                                  os=self.computer.os)
 
@@ -116,8 +117,9 @@ class MindFlow:
                         message, lmc = output, True
                     conversation.add("code")
                     
-            if not ("code" in conversation) or response.get("content", None) in self.breakers:
+            
+            if not ("code" in conversation) or response.get("content").endswith(self.breakers):
                 return # "The task is done."
-                    
+            
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 

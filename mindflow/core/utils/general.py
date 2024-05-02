@@ -2,6 +2,7 @@ import subprocess
 import importlib.util
 import toml
 from pathlib import Path
+from functools import lru_cache
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -51,19 +52,30 @@ def lazy_imports(packages: list[str | tuple[str]],
     
     return tuple(libs)
 
-def load_settings(settings=None, section=None, verbose=False):
+@lru_cache(maxsize=None)
+def merge_dicts(dict1, dict2):
+    for key, value in dict2.items():
+        if key in dict1:
+            if isinstance(value, dict) and isinstance(dict1[key], dict):
+                merge_dicts(dict1[key], value)  # Recursively merge child dictionaries
+            else:
+                dict1[key] = value  # Overwrite with the new value
+        else:
+            dict1[key] = value  # Add new key-value pairs
+    return dict1
+
+def load_settings(file: str | Path = None, settings=None, section=None, verbose=False):
     if settings is None:
-        
-        config = Path(ROOT_DIR, "config.toml")
         config_default = Path(ROOT_DIR, "config.default.toml")
-        
         with open(config_default, "r") as file:
             settings = toml.load(file)
-        
-        if config.is_file():
-            with open(config, "r") as file:
-                settings |= toml.load(file)
-        elif verbose:
-            print("config.toml not found, using config.defaults.toml instead!")
+            
+        if file:
+            config = Path(file)
+            if config.is_file():
+                with open(config, "r") as file:
+                    settings = merge_dicts(settings, toml.load(file))
+            elif verbose:
+                print("config.toml not found, using config.defaults.toml instead!")
 
     return settings.get(section, settings) if section else settings
