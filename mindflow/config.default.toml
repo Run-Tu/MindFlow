@@ -8,6 +8,6 @@ code="CodeQwen1.5-7b"
 vision="MiniCPM-Llama3-V-2.5"
 
 [defaults.src]
-llm="Nymbo/Llama-3.1-405B-Instruct"
+llm="Corvius/LLaMA-3.1-405B-Instruct"
 code="Qwen/CodeQwen1.5-7b-Chat-demo"
 vision="openbmb/MiniCPM-Llama3-V-2_5"

@@ -1,8 +1,8 @@
 import subprocess
 import importlib.util
 import toml
+import sys
 from pathlib import Path
-from functools import lru_cache
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -10,27 +10,42 @@ def is_installed(package):
     spec = importlib.util.find_spec(package)
     return spec is not None
 
-def lazy_import(package: str, 
+
+def lazy_import(package,
                 name: str = '', 
-                prefix: str = "pip install ",
-                user_install = False,
-                void = False) -> None:
-
-    user_option = " --user" if user_install else ""
-    name = name or package
-
-    if not is_installed(name):
-        print(f"`{package}` package is missing, proceeding to install.")
-        try:
-            subprocess.run(prefix + package + user_option, shell=True, check=True)
-        except subprocess.CalledProcessError:
-            print(f"Failed to install `{package}`.")
-            return None
+                prefixes: str = ("pip install ", "py -m pip install "),
+                install= False,
+                void = False,
+                optional=True):
     
+    if package in sys.modules:
+        return sys.modules[package]
+
+    spec = importlib.util.find_spec(name or package)
+    if spec is None:
+        if optional:
+            return None
+        elif install:
+            for prefix in prefixes:
+                print(f"Module '{package}' is missing, proceeding to install.")
+                try: subprocess.run(prefix + package, shell=True, check=True)
+                except subprocess.CalledProcessError: continue
+                break
+            raise ImportError(f"Failed to install module '{name or package}'")
+        else:
+            raise ImportError(f"Module '{name or package}' cannot be found")
+        
     if void:
         return None
-    
-    return importlib.import_module(package)
+
+    loader = importlib.util.LazyLoader(spec.loader)
+    spec.loader = loader
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    loader.exec_module(module)
+
+    return module
 
 def lazy_imports(packages: list[str | tuple[str]], 
                  prefix: str = "pip install ",
@@ -52,7 +67,6 @@ def lazy_imports(packages: list[str | tuple[str]],
     
     return tuple(libs)
 
-@lru_cache(maxsize=None)
 def merge_dicts(dict1, dict2):
     for key, value in dict2.items():
         if key in dict1:
@@ -67,14 +81,15 @@ def merge_dicts(dict1, dict2):
 def load_settings(file: str | Path = None, settings=None, section=None, verbose=False):
     if settings is None:
         config_default = Path(ROOT_DIR, "config.default.toml")
-        with open(config_default, "r") as file:
-            settings = toml.load(file)
+        with open(config_default, "r") as f:
+            settings = toml.load(f)
             
         if file:
             config = Path(file)
             if config.is_file():
-                with open(config, "r") as file:
-                    settings = merge_dicts(settings, toml.load(file))
+                with open(config, "r") as f:
+                    if (setting := toml.load(f)):
+                        settings = merge_dicts(settings, setting)
             elif verbose:
                 print("config.toml not found, using config.defaults.toml instead!")
 

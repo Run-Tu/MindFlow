@@ -108,9 +108,9 @@ class LLM:
             print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send)))
         
         try:
-            responses = interpret_input(self.llm.predict(message='\n'.join(map(to_chat, to_send)),
-                                                         system_message=to_chat(system), 
-                                                         api_name="/chat"))
+            responses = interpret_input(self.llm.predict(history=[['\n'.join(map(to_chat, to_send)), None]], 
+                                                         system_prompt=system,
+                                                         api_name="/bot")[-1][-1])
         except exceptions.AppError as e:
             print(f"gradio_client.exceptions.AppError({e})")
             exit()
@@ -123,7 +123,6 @@ class LLM:
                 print(to_chat(response | {"role": "assistant"}, logs=True))
 
         return responses
-
     # def chat(self, message: str):
     #     # Classify the prompt
     #     needs_search = self.classify_prompt(message)

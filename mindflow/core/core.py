@@ -10,9 +10,9 @@ class Profile:
     """
     store apikeys here. this is temp since its a bad setup omg.
     """
-    def __init__(self, keys: dict ={}):
+    def __init__(self, config_file= None, keys: dict ={}):
         
-        self.settings = load_settings()
+        self.settings = load_settings(file=config_file)
         self.keys = keys
         if not keys:
             self.keys = self.settings["defaults"]
@@ -36,12 +36,13 @@ class MindFlow:
             verbose: bool = False,
             local: bool = False,
             computer = None,
+            profile = None,
             llm = None,
             tasks = False,
-            breakers = tuple("The task is done.", "The conversation is done.")) -> None:
+            breakers = ("The task is done.", "The conversation is done.")) -> None:
         
         # settings
-        self.profile = Profile()
+        self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
         
         # utils
