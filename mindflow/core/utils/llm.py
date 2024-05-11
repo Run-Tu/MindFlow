@@ -2,7 +2,7 @@ from ...core.utils.general import load_settings
 from gradio_client import Client, exceptions
 from datetime import datetime
 from functools import partial
-
+import asyncio
 import re
 
 def interpret_input(input_str):
@@ -74,13 +74,21 @@ class LLM:
         self.is_code_default = self.keys["code"] == self.settings["defaults"]["code"]
         self.is_vision_default = self.keys["vision"] == self.settings["defaults"]["vision"]
 
-        # self.chat = self.litellm_chat
-        for key in tuple(self.keys)[:-1]:
-            if getattr(self, f"is_{key}_default"): # yes, im lazy :D
-                setattr(self, key, Client(self.settings["defaults"]["src"][key]))
-                
+        # Set up Gradio Client Endpoints
+        asyncio.run(self.setup_client())
+
         if self.is_llm_default:
             self.chat = self.gradio_chat
+
+    async def create_client(self, key):
+        return Client(self.settings["defaults"]["src"][key])
+
+    async def setup_client(self):
+        tasks = {key: self.create_client(key) for key in tuple(self.keys)[:-1] if getattr(self, f"is_{key}_default")}
+        clients = await asyncio.gather(*tasks.values())
+        
+        for key, client in zip(tasks.keys(), clients):
+            setattr(self, key, client)
 
     # def perform_search(self, queries, complexity, widget=None):
     #     # placeholder function
