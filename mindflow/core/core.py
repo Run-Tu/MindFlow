@@ -1,6 +1,6 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc
-from ..core.utils.general import load_settings
+from ..core.utils.general import load_settings, lazy_import
 from pathlib import Path
 import importlib
 import os
@@ -39,7 +39,7 @@ class MindFlow:
             profile = None,
             llm = None,
             tasks = False,
-            breakers = ("The task is done.", "The conversation is done.")) -> None:
+            breakers = ("the task is done.", "the conversation is done.")) -> None:
         
         # settings
         self.profile = Profile() if profile is None else profile
@@ -88,11 +88,12 @@ class MindFlow:
         for filename in prompts:
             with open(Path(self.prompts_dir, filename), "r") as f:
                 self.prompts[filename.split('.')[0]] = f.read().strip()
-                
+        
         self.prompts['initial'] = self.prompts['initial'].format(assistant=self.settings['assistant']['name'],
                                                                  personality=self.settings['assistant']['personality'],
                                                                  username=self.computer.user,
-                                                                 os=self.computer.os)
+                                                                 os=self.computer.os,
+                                                                 supported=self.computer.supported)
 
     def chat(self, 
             message: str = None, 
@@ -119,8 +120,9 @@ class MindFlow:
                     conversation.add("code")
                     
             
-            if not ("code" in conversation) or response.get("content").endswith(self.breakers):
-                return # "The task is done."
+            if not ("code" in conversation) or response.get("content").lower().endswith(self.breakers):
+                self.computer.globals = {"lazy_import": lazy_import} # Reset globals
+                return 
             
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
 

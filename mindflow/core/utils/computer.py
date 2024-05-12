@@ -4,12 +4,22 @@ import sys
 import platform
 from rich.console import Console
 from rich.syntax import Syntax
+from ..utils.general import lazy_import
 
 class Computer:
     def __init__(self) -> None:
         self.platform = platform.uname()
         self.user = os.getlogin()
         self.os = f"{self.platform.system} {self.platform.version}"
+        self.supported = ["python", "js"]
+        self.globals = {"lazy_import": lazy_import}
+        
+        if self.platform.system == "Windows":
+            self.supported += ["cmd", "powershell"]
+        elif self.platform.system == "Darwin":
+            self.supported += ["applescript"]
+        elif self.platform.system == "Linux":
+            self.supported += ["bash"]
         
     def run(self, code, format='python'):
         console = Console()
@@ -29,7 +39,7 @@ class Computer:
         
         if format == 'python':
             output = self.run_python(code)
-        elif format == 'shell':
+        elif (format == 'bash') or (format == 'cmd') or (format == 'shell'):
             output = self.run_shell(code)
         elif format == 'applescript' and platform.system() == 'Darwin':
             output = self.run_applescript(code)
@@ -48,7 +58,7 @@ class Computer:
         stdout = sys.stdout
         sys.stdout = output
         try:
-            exec(code, {})
+            exec(code, self.globals)
         except Exception as e:
             output.write(f"An error occurred: {e}")
         finally:
