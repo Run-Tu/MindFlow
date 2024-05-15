@@ -1,4 +1,0 @@
-poetry
-gradio_client
-toml
-rich
