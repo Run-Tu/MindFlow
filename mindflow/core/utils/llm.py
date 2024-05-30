@@ -3,6 +3,7 @@ from gradio_client import Client, exceptions
 from datetime import datetime
 from functools import partial
 import asyncio
+import os
 import re
 
 def interpret_input(input_str):
@@ -113,11 +114,13 @@ class LLM:
             self.messages.append(message)
             
         if self.verbose:
-            print('\n' + '\n'.join(map(partial(to_chat, logs=True), to_send)))
+            print("\n----- MESSAGE HISTORY -----")
+            print('\n'.join(map(partial(to_chat, logs=True), to_send)))
         
         try:
             responses = interpret_input(self.llm.predict(history=[['\n'.join(map(to_chat, to_send)), None]], 
                                                          system_prompt=system,
+                                                         max_tokens=8192,
                                                          api_name="/bot")[-1][-1])
         except exceptions.AppError as e:
             print(f"gradio_client.exceptions.AppError({e})")
@@ -129,6 +132,9 @@ class LLM:
                 
             if self.verbose:
                 print(to_chat(response | {"role": "assistant"}, logs=True))
+        
+        if self.verbose:    
+            print("--- END MESSAGE HISTORY ---\n")
 
         return responses
     # def chat(self, message: str):

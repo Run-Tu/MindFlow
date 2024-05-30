@@ -1,0 +1,3 @@
+Interactive <Language>
+
+Basically like Interactive Python Notebooks but for all languages. This way, the AI can easily document code while writing them as they all get merged together. 

@@ -16,7 +16,6 @@ def parse_args():
 
     args = parser.parse_args()
     kwargs = {'verbose': args.verbose}
-    
     if args.default:
         return kwargs
     

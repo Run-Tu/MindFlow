@@ -20,20 +20,21 @@ class Computer:
             self.supported += ["applescript"]
         elif self.platform.system == "Linux":
             self.supported += ["bash"]
+            
+    def md(self, code, format='python', console=Console()):
+        console.print(Syntax(code, format, theme="github-dark", line_numbers=True))
+        print()
         
+
     def run(self, code, format='python'):
         console = Console()
-        syntax = Syntax(code, format, theme="github-dark", line_numbers=True)
-        
         if format == 'pseudocode':
             console.print(f'[bold #4a4e54]{chr(0x1F785)} Task plan in `{format}`...[/bold #4a4e54]')
-            console.print(syntax)
-            print()
+            self.md(code, format, console)
             return None
 
         console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
-        console.print(syntax)
-        print()
+        self.md(code, format, console)
         
         output = ""
         

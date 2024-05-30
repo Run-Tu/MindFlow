@@ -10,7 +10,7 @@ def to_chat(lmc: dict) -> str:
                                        lmc.get("format", None))
     
     time = datetime.now().strftime("%I:%M %p %d/%m/%Y")
-    return (f"[bold #4a4e54]{chr(0x1F785)} ({time})[/bold #4a4e54] [italic bold]{_role}[/italic bold]", Markdown(_content))
+    return (f"[bold #4a4e54]\u25CB ({time})[/bold #4a4e54] [italic bold]{_role}[/italic bold]", Markdown(_content))
 
 def main(macro):
     console = Console()

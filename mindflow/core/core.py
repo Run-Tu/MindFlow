@@ -47,7 +47,7 @@ class MindFlow:
         
         # utils
         self.computer = Computer() if computer is None else computer
-        self.llm = LLM(self.profile, messages=messages) if llm is None else llm
+        self.llm = LLM(self.profile, messages=messages, verbose=verbose) if llm is None else llm
         self.tasks = tasks
 
         # logging + debugging
@@ -92,8 +92,9 @@ class MindFlow:
         self.prompts['initial'] = self.prompts['initial'].format(assistant=self.settings['assistant']['name'],
                                                                  personality=self.settings['assistant']['personality'],
                                                                  username=self.computer.user,
-                                                                 os=self.computer.os,
-                                                                 supported=self.computer.supported)
+                                                                 os=self.computer.os)
+        
+        self.prompts['initial'] += self.prompts['instructions'].format(supported=self.computer.supported)
 
     def chat(self, 
             message: str = None, 
@@ -102,6 +103,7 @@ class MindFlow:
             timeout=16):
         
         lmc, conversation = False, set()
+        notebooks = {}
         for _ in range(timeout):
             responses = self.llm.chat(message, system=self.prompts["initial"], lmc=lmc)
             lmc = False
@@ -112,16 +114,25 @@ class MindFlow:
                     yield response
                 
                 if response.get("type", None) == "code":
-                    output = to_lmc(self.computer.run(response.get("content", None), format=response.get("format", "python")),
-                                    role="computer", format="output")
-                    if output.get("content", None):
-                        yield output
-                        message, lmc = output, True
-                    conversation.add("code")
+                    language, code = response.get("format", "python"), response.get("content", None)
+                    if language in notebooks:
+                        notebooks[language] += "\n\n" + code
+                    else:
+                        notebooks[language] = code
+                    self.computer.md(code, language)
                     
+                if "let's run the code" in response.get("content").lower():
+                    for language, code in notebooks.items():
+                        output = to_lmc(self.computer.run(code, format=language),
+                                            role="computer", format="output")
+                        if output.get("content", None):
+                            yield output
+                            message, lmc = output, True
+                        conversation.add("code")
             
             if not ("code" in conversation) or response.get("content").lower().endswith(self.breakers):
                 self.computer.globals = {"lazy_import": lazy_import} # Reset globals
+                notebooks = {}
                 return 
             
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
