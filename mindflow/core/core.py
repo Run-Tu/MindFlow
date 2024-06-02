@@ -1,6 +1,7 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc
-from ..core.utils.general import load_settings, lazy_import
+from ..core.utils.general import load_settings, lazy_import, ROOT_DIR
+from ..extensions import instructions
 from pathlib import Path
 import importlib
 import os
@@ -94,7 +95,11 @@ class MindFlow:
                                                                  username=self.computer.user,
                                                                  os=self.computer.os)
         
-        self.prompts['initial'] += self.prompts['instructions'].format(supported=self.computer.supported)
+        extensions = "\n".join(instructions(f) for f in os.listdir(Path(ROOT_DIR, "extensions", "extensions")))
+        self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
+                                                                       extensions=str(extensions))
+        
+        print(self.prompts['initial'])
 
     def chat(self, 
             message: str = None, 

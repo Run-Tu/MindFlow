@@ -39,7 +39,7 @@ class Browser:
             self.loop.run_until_complete(self.init_playwright())
 
     async def playwright_search(self, query: str, 
-                                complexity: int = 3, 
+                                n: int = 3, 
                                 widget: str = None):
         page = await self.browser.new_page()
 
@@ -56,10 +56,10 @@ class Browser:
             results["widget"] = await function(page) 
 
         keys = {key: None for key in engine["search"].keys()}
-        results["searches"] = [dict(keys) for _ in range(complexity)]
+        results["searches"] = [dict(keys) for _ in range(n)]
         for key, selector in engine["search"].items():
             elements = await page.query_selector_all(selector)
-            elements = elements[:complexity]
+            elements = elements[:n]
 
             for index, elem in enumerate(elements):
                 if key == "link":
@@ -81,14 +81,14 @@ class Browser:
             await self.browser.close()
             await self.playwright.__aexit__()
 
-    def search(self, queries: list, complexity: int = 3, widget=None):
+    def search(self, queries: list, n: int = 3, widget=None):
         if self.key == 'playwright':
-            return self.loop.run_until_complete(self.run_search(queries, complexity, widget))
+            return self.loop.run_until_complete(self.run_search(queries, n, widget))
         elif self.name == 'google':
-            return {query: self.google_search(query, complexity) for query in queries}
+            return {query: self.google_search(query, n) for query in queries}
 
-    async def run_search(self, queries: list, complexity: int = 3, widget=None):
-        tasks = tuple(self.playwright_search(query, complexity, widget) for query in queries)
+    async def run_search(self, queries: list, n: int = 3, widget=None):
+        tasks = tuple(self.playwright_search(query, n, widget) for query in queries)
         results = await asyncio.gather(*tasks)
         return dict(zip(queries, results))
 
@@ -96,7 +96,7 @@ class Browser:
         site = await self.load_site(query["link"], clean)
         return query | {"content": site}
     
-    def load_searches(self, queries: dict, complexity: int):
+    def load_searches(self, queries: dict):
         # must be a better way to do this in async than flattening it
         tasks = []
         for query in queries.values():
@@ -104,8 +104,8 @@ class Browser:
             
         loop = asyncio.get_event_loop()
         results = loop.run_until_complete(asyncio.gather(*tasks))
-        
-        pairs = [results[i:i + complexity] for i in range(0, len(results), complexity)]
+        n = len(queries)
+        pairs = [results[i:i + n] for i in range(0, len(results), n)]
 
         # really bad algo :/
         i = 0
@@ -126,7 +126,7 @@ class Browser:
                  "link": result[link],
                  "description": result[desc]} for result in results]
 
-    def google_search(self, query: str, complexity: int = 3):
+    def google_search(self, query: str, n: int = 3):
         base_url = "https://www.googleapis.com/customsearch/v1"
         cx = "65a4f09c14c4846ee"
 
@@ -134,7 +134,7 @@ class Browser:
             "key": self.key,
             "cx": cx,
             "q": query,
-            "num": complexity
+            "num": n
         }
 
         try:

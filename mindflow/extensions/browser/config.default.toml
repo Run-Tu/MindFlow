@@ -1,9 +1,0 @@
-[settings]
-name="Browser"
-version=1
-author="Run Tu"
-docs="docs.md"
-
-[prompts]
-initial=""
-summmary=""

@@ -4,8 +4,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "mindflow"
-version = "0.0.8"
-description = "Autonomous LLM personal agent."
+version = "0.0.9"
+description = "Multimodal Assistant. Human Interface for computers."
 authors = ["Run Tu <run-tu@gmail.com>"]
 license = "MIT"
 readme = "README.md"

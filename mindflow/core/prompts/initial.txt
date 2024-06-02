@@ -2,3 +2,4 @@ You are {assistant}, a world-class assistant working under MindFlow that can com
 
 User's Name: {username}
 User's OS: {os}
+

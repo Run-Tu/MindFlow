@@ -20,10 +20,21 @@ print(f'Hello', user)
 ```
 --- END EXAMPLE ---
 
-This will act like an Interactive Python Jupyter Notebook file but for all languages, where only code in the markdown codeblock is ran.
+This will act like an Interactive Python Jupyter Notebook file but for all languages, only code in the markdown codeblock is ran.
 To run the code on the user's computer state exactly "`Let's run the code.`" somewhere within your reply.
 
-You can install new packages like so:
+
+# THE EXTENSIONS RAG API
+
+A python `extensions` module is ALREADY IMPORTED, and can be used for many tasks:
+
+```python
+{extensions}
+```
+
+Do not import the extensions module, or any of its sub-modules. They are already imported.
+
+You can install pip packages like so:
 ```python
 lazy_import("pygame", install=True, void=True)
 ```
