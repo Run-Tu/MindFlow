@@ -108,7 +108,7 @@ class LLM:
         system = to_lmc(system, role="system")
         message = message if lmc else to_lmc(message, role=role)
         
-        to_send = (self.messages if context is True else context) + [message]
+        to_send = (self.messages if context is True else context) + [system] + [message]
         
         if remember:
             self.messages.append(message)
@@ -118,12 +118,10 @@ class LLM:
             print('\n'.join(map(partial(to_chat, logs=True), to_send)))
         
         try:
-            response = self.llm.predict(history=[['\n'.join(map(to_chat, to_send)), None]], 
-                                                         system_prompt=system,
-                                                         max_tokens=8192,
-                                                         api_name="/bot")
-            print(response)
-            responses = interpret_input(response[-1][-1])
+            response = self.llm.predict(message='\n'.join(map(to_chat, to_send)),
+                                                         param_3=8192,
+                                                         api_name="/chat")
+            responses = interpret_input(response)
         except exceptions.AppError as e:
             print(f"gradio_client.exceptions.AppError({e})")
             exit()

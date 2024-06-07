@@ -99,7 +99,7 @@ class MindFlow:
         self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
                                                                        extensions=str(extensions))
         
-        print(self.prompts['initial'])
+        #print(self.prompts['initial'])
 
     def chat(self, 
             message: str = None, 

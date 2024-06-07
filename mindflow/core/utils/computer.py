@@ -5,7 +5,7 @@ import platform
 from rich.console import Console
 from rich.syntax import Syntax
 from ..utils.general import lazy_import
-from ...extensions import docs, instructions
+from ...extensions import Extensions, instructions
 import threading
 from functools import partial
 
@@ -16,7 +16,7 @@ class Computer:
         self.os = f"{self.platform.system} {self.platform.version}"
         self.supported = ["python", "js"]
         self.globals = {"lazy_import": lazy_import,
-                        "docs": docs, 
+                        "extensions": Extensions(),
                         "instructions": instructions}
         
         if self.platform.system == "Windows":

@@ -38,7 +38,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    extensions = Extensions()
     macro = MindFlow(**args)
     cli.main(macro)
 
