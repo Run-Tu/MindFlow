@@ -3,11 +3,11 @@ name="Basil"
 personality="You have a kind, deterministic and professional attitude towards your work and respond in a formal, yet casual manner."
 
 [defaults]
-llm="Llama-3.1-70B-Instruct"
+llm="Llama-3.1-405B-Instruct"
 code="CodeQwen1.5-7b"
 vision="MiniCPM-Llama3-V-2.5"
 
 [defaults.src]
-llm="aixsatoshi/Meta-Llama-3.1-70B-Instruct-AWQ-INT4"
+llm="Corvius/LLaMA-3.1-405B-Instruct"
 code="Qwen/CodeQwen1.5-7b-Chat-demo"
 vision="openbmb/MiniCPM-Llama3-V-2_5"
