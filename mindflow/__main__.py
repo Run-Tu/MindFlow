@@ -2,7 +2,6 @@ import argparse
 from .core import cli
 import shutil
 from .core.core import MindFlow, Profile
-from .extensions import Extensions
 from .core.utils.general import ROOT_DIR
 
 from pathlib import Path

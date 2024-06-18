@@ -110,7 +110,9 @@ class MindFlow:
         lmc, conversation = False, set()
         notebooks = {}
         for _ in range(timeout):
-            responses = self.llm.chat(message, system=self.prompts["initial"], lmc=lmc)
+            responses = self.llm.chat(message=message, 
+                                      system=self.prompts["initial"],
+                                      lmc=lmc)
             lmc = False
             
             for response in responses: 

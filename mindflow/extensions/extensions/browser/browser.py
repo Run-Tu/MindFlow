@@ -11,7 +11,7 @@ from utils.google_snippets import (get_weather,
                                    get_reviews)
 
 class Browser:
-    def __init__(self, key,
+    def __init__(self,
                  ignore: tuple[str] = None):
         self.key = "playwright"
         self.name = "google"
