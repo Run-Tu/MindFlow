@@ -1,4 +1,4 @@
-async def get_events(self, page):
+async def get_events(page):
     classnames = {
         "title": "div.YOGjf",
         "location": "div.zvDXNd",
@@ -34,7 +34,7 @@ async def get_events(self, page):
 
     return events
 
-async def get_showtimes(self, page):
+async def get_showtimes(page):
     classnames = {
         "venue": "div.YS9glc > div:not([class])",
         "location": "div.O4B9Zb"
@@ -74,7 +74,7 @@ async def get_showtimes(self, page):
     return events
 
 
-async def get_reviews(self, page):
+async def get_reviews(page):
     classnames = {
         "site": "span.rhsB",
         "rating": "span.gsrt"
@@ -97,7 +97,7 @@ async def get_reviews(self, page):
 
     return events
 
-async def get_weather(self, page):
+async def get_weather(page):
     classnames = {
         "weather": "span#wob_dc",
         "time": "div#wob_dts",

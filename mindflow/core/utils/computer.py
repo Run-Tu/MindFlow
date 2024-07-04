@@ -19,6 +19,8 @@ class Computer:
                         "extensions": Extensions(),
                         "instructions": instructions}
         
+        print(self.globals)
+        
         if self.platform.system == "Windows":
             self.supported += ["cmd", "powershell"]
         elif self.platform.system == "Darwin":
@@ -71,7 +73,7 @@ class Computer:
         stdout = sys.stdout
         sys.stdout = output
         try:
-            exec(code, self.globals)
+            exec(code, self.globals.copy())
         except Exception as e:
             output.write(f"An error occurred: {e}")
         finally:

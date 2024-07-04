@@ -5,7 +5,7 @@ from markdownify import markdownify as md
 from bs4 import BeautifulSoup
 import re
 
-from utils.google_snippets import (get_weather, 
+from .utils.google_snippets import (get_weather, 
                                    get_showtimes, 
                                    get_events, 
                                    get_reviews)
@@ -82,10 +82,12 @@ class Browser:
             await self.playwright.__aexit__()
 
     def search(self, queries: list, n: int = 3, widget=None):
+        if isinstance(queries, str):
+            queries = [queries]
         if self.key == 'playwright':
             return self.loop.run_until_complete(self.run_search(queries, n, widget))
         elif self.name == 'google':
-            return {query: self.google_search(query, n) for query in queries}
+            return {query: self.google_search(query, n, widget) for query in queries}
 
     async def run_search(self, queries: list, n: int = 3, widget=None):
         tasks = tuple(self.playwright_search(query, n, widget) for query in queries)

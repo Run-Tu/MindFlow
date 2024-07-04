@@ -1,11 +1,10 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc
-from ..core.utils.general import load_settings, lazy_import, ROOT_DIR
+from ..core.utils.general import load_settings, ROOT_DIR
 from ..extensions import instructions
 from pathlib import Path
 import importlib
 import os
-import toml
 
 class Profile:
     """
@@ -138,7 +137,6 @@ class MindFlow:
                         conversation.add("code")
             
             if not ("code" in conversation) or response.get("content").lower().endswith(self.breakers):
-                self.computer.globals = {"lazy_import": lazy_import} # Reset globals
                 notebooks = {}
                 return 
             

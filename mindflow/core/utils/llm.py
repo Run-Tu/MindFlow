@@ -81,7 +81,6 @@ class LLM:
         # use SnSdk
         self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct",
                          remember=True,
-                         priority=1,
                          messages=[] if messages is None else messages)
         self.messages = self.llm.messages
 
@@ -89,7 +88,8 @@ class LLM:
             self.chat = self.sn_chat
             
     def sn_chat(self, **kwargs):
-        return interpret_input(self.llm.chat(**kwargs))
+        message = self.llm.chat(**kwargs, max_tokens=3292)
+        return interpret_input(message)
 
     # async def create_client(self, key):
     #     return Client(self.settings["defaults"]["src"][key])

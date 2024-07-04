@@ -8,9 +8,10 @@ license = "MIT"
 readme = "README.md"
 
 [setup]
+init="__init__.py"
 instructions="docs/instructions.md"
-docs = "docs/docs.md"
-source = "https://github.com/MindFlow/browser.git"
+docs="docs/docs.md"
+source="https://github.com/MindFlow/browser.git"
 
 [dependencies]
 gradio_client = "^1.3.0" 
