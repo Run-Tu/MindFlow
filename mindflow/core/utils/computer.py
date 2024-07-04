@@ -19,8 +19,6 @@ class Computer:
                         "extensions": Extensions(),
                         "instructions": instructions}
         
-        print(self.globals)
-        
         if self.platform.system == "Windows":
             self.supported += ["cmd", "powershell"]
         elif self.platform.system == "Darwin":

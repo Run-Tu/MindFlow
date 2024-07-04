@@ -30,10 +30,8 @@ class Extensions:
                 spec = importlib.util.spec_from_file_location(extension.name, extension / file)
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[extension.name] = module
-                print("aaaaaaaa")
                 spec.loader.exec_module(module)
-                
-                print("PASS")
+
                 setattr(self, extension.name, getattr(module, extension.name.title())())
                 self.extensions.append(extension.name)
             
