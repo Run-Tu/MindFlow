@@ -5,19 +5,17 @@ import platform
 from rich.console import Console
 from rich.syntax import Syntax
 from ..utils.general import lazy_import
-from ...extensions import Extensions, instructions
 import threading
 from functools import partial
 
 class Computer:
-    def __init__(self) -> None:
+    def __init__(self, extensions) -> None:
         self.platform = platform.uname()
         self.user = os.getlogin()
         self.os = f"{self.platform.system} {self.platform.version}"
         self.supported = ["python", "js"]
         self.globals = {"lazy_import": lazy_import,
-                        "extensions": Extensions(),
-                        "instructions": instructions}
+                        "extensions": extensions}
         
         if self.platform.system == "Windows":
             self.supported += ["cmd", "powershell"]

@@ -9,22 +9,24 @@ class Extensions:
     def __init__(self):
         self.extensions_dir = Path(ROOT_DIR, "extensions", "extensions")
         self.extensions = []
+        self.instructions = {}
         
         for extension in self.extensions_dir.iterdir():
             if not extension.is_dir():
                 continue
             
-            file = '__init__.py'
-            if not (extension / "__init__.py").exists():
-                if not (config_path := extension / "omproject.toml").exists():
-                    print(f"Failed to import {extension.name}: `omproject.toml` doesn't exist!")
-                    continue
-                    
-                with open(config_path, "r") as f:
-                    config = toml.load(f.read())["setup"]
-                if not (file := config.get("init", None)):
-                    print(f"Failed to import {extension.name}: `init` in `omproject.toml` not specified!")
-                    continue
+            file = '__init__.py' if (extension / "__init__.py").exists() else None
+                
+            if not (config_path := extension / "omproject.toml").exists():
+                print(f"Failed to import {extension.name}: `omproject.toml` doesn't exist!")
+                continue
+                
+            with open(config_path, "r") as f:
+                config = toml.loads(f.read())["setup"]
+                
+            if not file and not (file := config.get("init", None)):
+                print(f"Failed to import {extension.name}: `init` in `omproject.toml` not specified!")
+                continue
 
             try:
                 spec = importlib.util.spec_from_file_location(extension.name, extension / file)
@@ -34,22 +36,12 @@ class Extensions:
 
                 setattr(self, extension.name, getattr(module, extension.name.title())())
                 self.extensions.append(extension.name)
+                with open(extension / config["instructions"], "r") as f:
+                    self.instructions[extension.name] = f.read()
             
-            except ImportError as e:
+            except Exception as e:
                 print(f"Failed to import {extension.name}: {e}")
-
-                        
-def instructions(extension):
-    extensions = os.listdir(Path(ROOT_DIR, "extensions", "extensions"))
-    if not (extension in extensions):
-        print("Extension does not exists.")
-        return
-    
-    root = Path(ROOT_DIR, "extensions", "extensions", extension)
-    path = toml.load(Path(root, "omproject.toml"))["setup"]["instructions"]
-    
-    with open(Path(root, path), "r") as f:
-        instructions = f.read()
+                
+    def load_instructions(self) -> str:
+        return "\n".join(f"# {name} EXTENSION\n{instructions}" for name, instructions in self.instructions.items())
         
-    return instructions
-

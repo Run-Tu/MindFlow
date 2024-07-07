@@ -1,7 +1,7 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc
 from ..core.utils.general import load_settings, ROOT_DIR
-from ..extensions import instructions
+from ..extensions import Extensions
 from pathlib import Path
 import importlib
 import os
@@ -46,7 +46,8 @@ class MindFlow:
         self.settings = self.profile.settings
         
         # utils
-        self.computer = Computer() if computer is None else computer
+        self.extensions = Extensions()
+        self.computer = Computer(self.extensions) if computer is None else computer
         self.llm = LLM(self.profile, messages=messages, verbose=verbose) if llm is None else llm
         self.tasks = tasks
 
@@ -66,21 +67,6 @@ class MindFlow:
 
         # experimental
         self.local = local
-        
-        # extensions including ['browser'] by default
-        for extension in os.listdir(self.extensions_dir):
-            module_path = os.path.join(self.extensions_dir, extension)
-            if os.path.isdir(module_path) and '__init__.py' in os.listdir(module_path):
-                try:
-                    module = importlib.import_module(extension)
-                    name = extension.title()
-                    setattr(self, name, getattr(module, name)())
-                except ImportError:
-                    config_path = Path(self.extensions_dir, extension, "config.default.toml")
-                    if config_path.exists():
-                        with open(config_path, "r") as f:
-                            # Handle the config file as needed
-                            pass
 
         # prompts
         self.prompts = {}
@@ -94,15 +80,11 @@ class MindFlow:
                                                                  username=self.computer.user,
                                                                  os=self.computer.os)
         
-        extensions = "\n".join(instructions(f) for f in os.listdir(Path(ROOT_DIR, "extensions", "extensions")))
         self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
-                                                                       extensions=str(extensions))
-        
-        #print(self.prompts['initial'])
+                                                                                extensions=self.extensions.load_instructions())
 
     def chat(self, 
             message: str = None, 
-            display: bool = True, 
             stream: bool = False,
             timeout=16):
         

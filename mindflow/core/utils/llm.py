@@ -88,7 +88,7 @@ class LLM:
             self.chat = self.sn_chat
             
     def sn_chat(self, **kwargs):
-        message = self.llm.chat(**kwargs, max_tokens=3292)
+        message = self.llm.chat(**kwargs, max_tokens=3200)
         return interpret_input(message)
 
     # async def create_client(self, key):

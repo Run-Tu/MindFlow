@@ -34,6 +34,8 @@ def lazy_import(package,
             raise ImportError(f"Failed to install module '{name or package}'")
         else:
             raise ImportError(f"Module '{name or package}' cannot be found")
+    else:
+        print(f"Module '{package}' is already installed.")
         
     if void:
         return None
