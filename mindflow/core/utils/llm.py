@@ -1,10 +1,5 @@
-from ...core.utils.general import load_settings
-from gradio_client import Client, exceptions
 from snova import SnSdk
 from datetime import datetime
-from functools import partial
-import asyncio
-import os
 import re
 
 def interpret_input(input_str):
@@ -75,9 +70,6 @@ class LLM:
         self.is_code_default = self.keys["code"] == self.settings["defaults"]["code"]
         self.is_vision_default = self.keys["vision"] == self.settings["defaults"]["vision"]
 
-        # Set up Gradio Client Endpoints
-        #asyncio.run(self.setup_client())
-        
         # use SnSdk
         self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct",
                          remember=True,
@@ -90,56 +82,3 @@ class LLM:
     def sn_chat(self, **kwargs):
         message = self.llm.chat(**kwargs, max_tokens=3200)
         return interpret_input(message)
-
-    # async def create_client(self, key):
-    #     return Client(self.settings["defaults"]["src"][key])
-
-    # async def setup_client(self):
-    #     tasks = {key: self.create_client(key) for key in tuple(self.keys)[:-1] if getattr(self, f"is_{key}_default")}
-    #     clients = await asyncio.gather(*tasks.values())
-        
-    #     for key, client in zip(tasks.keys(), clients):
-    #         setattr(self, key, client)
-    
-    # def gradio_chat(self, 
-    #                 message: str, 
-    #                 role = "user", 
-    #                 remember=True, 
-    #                 context=True,
-    #                 lmc=False,
-    #                 system: str = 'You are a helpful assistant.'):
-        
-    #     system = to_lmc(system, role="system")
-    #     message = message if lmc else to_lmc(message, role=role)
-        
-    #     to_send = (self.messages if context is True else context) + [message]
-        
-    #     if remember:
-    #         self.messages.append(message)
-            
-    #     if self.verbose:
-    #         print("\n----- MESSAGE HISTORY -----")
-    #         print('\n'.join(map(partial(to_chat, logs=True), to_send)))
-        
-    #     try:
-    #         response = self.llm.predict(history=[['\n'.join(map(to_chat, to_send)), None]], 
-    #                                                      system_prompt=system,
-    #                                                      max_tokens=8192,
-    #                                                      api_name="/bot")
-    #         responses = interpret_input(response[-1][-1])
-    #     except exceptions.AppError as e:
-    #         print(f"gradio_client.exceptions.AppError({e})")
-    #         exit()
-        
-    #     for response in responses:
-    #         if remember:
-    #             self.messages.append(response | {"role": "assistant"})
-                
-    #         if self.verbose:
-    #             print(to_chat(response | {"role": "assistant"}, logs=True))
-        
-    #     if self.verbose:    
-    #         print("--- END MESSAGE HISTORY ---\n")
-
-    #     return responses
-
