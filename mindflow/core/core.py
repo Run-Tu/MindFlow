@@ -1,7 +1,7 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc
-from ..core.utils.general import load_settings, ROOT_DIR
-from ..extensions import Extensions
+from ..core.utils.general import load_settings
+from ..core.utils.extensions import Extensions
 from pathlib import Path
 import os
 

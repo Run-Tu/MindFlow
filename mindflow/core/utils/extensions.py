@@ -1,4 +1,4 @@
-from ..core.utils.general import ROOT_DIR
+from .general import ROOT_DIR
 from pathlib import Path
 import toml
 import os
@@ -7,7 +7,7 @@ import importlib
 
 class Extensions:
     def __init__(self):
-        self.extensions_dir = Path(ROOT_DIR, "extensions", "extensions")
+        self.extensions_dir = Path(ROOT_DIR, "extensions")
         self.extensions = []
         self.instructions = {}
         

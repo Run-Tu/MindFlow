@@ -1,0 +1,3 @@
+results = extensions.browser.search(query, n=3) # Returns list of dictionaries of top 3 results from Google Search. [{"title", "description", "link"}, ...].
+contents = extensions.browser.load_search(results) # Returns string of page contents in markdown, from a dictionary from a browser.search. NOTE, this uses a lot of context window, only use this when essential.
+showtimes = extensions.browser.search("Inside Out 2 showtimes", 0, widget="showtimes")[0] # Returns dictionary of Google Snippet for showtimes of query. Can be used with other Google Snippet options including ['showtimes', 'weather', 'events', 'reviews']
