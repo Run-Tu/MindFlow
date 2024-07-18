@@ -60,9 +60,10 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, profile, verbose=False, messages: list = None):
+    def __init__(self, profile, verbose=False, messages: list = None, system=""):
         self.settings = profile.settings
         self.keys = profile.keys
+        self.system = system
 
         self.verbose = verbose
         
@@ -73,6 +74,8 @@ class LLM:
         # use SnSdk
         self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct",
                          remember=True,
+                         priority=2,
+                         system=self.system,
                          messages=[] if messages is None else messages)
         self.messages = self.llm.messages
 
@@ -80,5 +83,7 @@ class LLM:
             self.chat = self.sn_chat
             
     def sn_chat(self, **kwargs):
+        if self.system:
+            return interpret_input(self.llm.chat(**kwargs, system=self.system, max_tokens=3200))
         message = self.llm.chat(**kwargs, max_tokens=3200)
         return interpret_input(message)

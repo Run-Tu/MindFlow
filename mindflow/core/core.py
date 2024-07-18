@@ -44,25 +44,17 @@ class MindFlow:
         self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
         
-        # utils
-        self.extensions = Extensions()
-        self.computer = Computer(self.extensions) if computer is None else computer
-        self.llm = LLM(self.profile, messages=messages, verbose=verbose) if llm is None else llm
-        self.tasks = tasks
-
-        # logging + debugging
-        self.verbose = verbose
-        
-        # loop breakers
-        self.breakers = breakers
-        
+                
         # memory + history
         self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
         self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
         self.extensions_dir = Path(Path(__file__).parent.parent, "extensions") if extensions_dir is None else extensions_dir
         
-        self.llm.messages = [] if messages is None else messages
+
+        self.extensions = Extensions()
+        self.computer = Computer(self.extensions) if computer is None else computer
+        
 
         # experimental
         self.local = local
@@ -81,19 +73,32 @@ class MindFlow:
         
         self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
                                                                                 extensions=self.extensions.load_instructions())
+        
+                # utils
+        self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
+        self.tasks = tasks
+
+        # logging + debugging
+        self.verbose = verbose
+        
+        # loop breakers
+        self.breakers = breakers
+
+        self.llm.messages = [] if messages is None else messages
+        
 
     def chat(self, 
             message: str = None, 
             stream: bool = False,
             timeout=16):
         
-        lmc, conversation = False, set()
         notebooks = {}
+        lmc = False
         for _ in range(timeout):
             responses = self.llm.chat(message=message, 
-                                      system=self.prompts["initial"],
                                       lmc=lmc)
             lmc = False
+            conversation = set()
             
             for response in responses: 
                 if response.get("type", None) == "message":
@@ -116,7 +121,7 @@ class MindFlow:
                             yield output
                             message, lmc = output, True
                         conversation.add("code")
-            
+                        
             if not ("code" in conversation) or response.get("content").lower().endswith(self.breakers):
                 notebooks = {}
                 return 

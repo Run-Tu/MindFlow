@@ -13,9 +13,10 @@ def is_installed(package):
 
 def lazy_import(package,
                 name: str = '', 
-                prefixes: str = ("pip install ", "py -m pip install "),
+                prefixes: tuple = ("pip install ", "py -m pip install "),
                 install= False,
                 void = False,
+                verbose = True,
                 optional=True):
     
     if package in sys.modules:
@@ -26,26 +27,41 @@ def lazy_import(package,
         if optional:
             return None
         elif install:
-            for prefix in prefixes:
+            if verbose:
                 print(f"Module '{package}' is missing, proceeding to install.")
-                try: subprocess.run(prefix + package, shell=True, check=True)
-                except subprocess.CalledProcessError: continue
-                break
-            raise ImportError(f"Failed to install module '{name or package}'")
+            
+            success = False
+            for prefix in prefixes:
+                try: 
+                    subprocess.run(prefix + package, shell=True, check=True)
+                    success = True
+                    break
+                except subprocess.CalledProcessError: 
+                    continue
+            if not success:
+                raise ImportError(f"Failed to install module '{name or package}'")
+            spec = importlib.util.find_spec(name or package)
+            if spec is None:
+                raise ImportError(f"Failed to install module '{name or package}'")
         else:
             raise ImportError(f"Module '{name or package}' cannot be found")
-    else:
+    elif verbose:
         print(f"Module '{package}' is already installed.")
         
     if void:
         return None
 
-    loader = importlib.util.LazyLoader(spec.loader)
-    spec.loader = loader
+    if not install:
+        loader = importlib.util.LazyLoader(spec.loader)
+        spec.loader = loader
 
     module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    loader.exec_module(module)
+    sys.modules[name or package] = module
+    
+    if install:
+        spec.loader.exec_module(module)
+    
+    importlib.reload(module) 
 
     return module
 
@@ -73,11 +89,11 @@ def merge_dicts(dict1, dict2):
     for key, value in dict2.items():
         if key in dict1:
             if isinstance(value, dict) and isinstance(dict1[key], dict):
-                merge_dicts(dict1[key], value)  # Recursively merge child dictionaries
+                merge_dicts(dict1[key], value)
             else:
-                dict1[key] = value  # Overwrite with the new value
+                dict1[key] = value
         else:
-            dict1[key] = value  # Add new key-value pairs
+            dict1[key] = value  
     return dict1
 
 def load_settings(file: str | Path = None, settings=None, section=None, verbose=False):
