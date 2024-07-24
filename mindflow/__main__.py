@@ -3,6 +3,7 @@ from .core import cli
 import shutil
 from .core.core import MindFlow, Profile
 from .core.utils.general import ROOT_DIR
+import asyncio
 
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def parse_args():
 def main():
     args = parse_args()
     macro = MindFlow(**args)
-    cli.main(macro)
+    asyncio.run(cli.main(macro))
 
 if __name__ == "__main__":
     main()

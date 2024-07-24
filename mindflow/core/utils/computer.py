@@ -29,15 +29,18 @@ class Computer:
         print()
         
 
-    def run(self, code, format='python'):
-        console = Console()
-        if format == 'pseudocode':
-            console.print(f'[bold #4a4e54]{chr(0x1F785)} Task plan in `{format}`...[/bold #4a4e54]')
-            self.md(code, format, console)
-            return None
+    def run(self, code, format='python', display=True):
+        if display:
+            print("\n")
 
-        console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
-        self.md(code, format, console)
+            console = Console()
+            if format == 'pseudocode':
+                console.print(f'[bold #4a4e54]{chr(0x1F785)} Task plan in `{format}`...[/bold #4a4e54]')
+                self.md(code, format, console)
+                return None
+
+            console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
+            self.md(code, format, console)
         
         self.output = ""
         

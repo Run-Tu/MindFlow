@@ -84,6 +84,5 @@ class LLM:
             
     def sn_chat(self, **kwargs):
         if self.system:
-            return interpret_input(self.llm.chat(**kwargs, system=self.system, max_tokens=3200))
-        message = self.llm.chat(**kwargs, max_tokens=3200)
-        return interpret_input(message)
+            return self.llm.chat(**kwargs, system=self.system, max_tokens=3000)
+        return self.llm.chat(**kwargs, max_tokens=3000)

@@ -99,7 +99,7 @@ async def get_reviews(page):
 
 async def get_weather(page):
     classnames = {
-        "weather": "span#wob_dc",
+        "condition": "span#wob_dc",
         "time": "div#wob_dts",
         "temperature": "span#wob_tm",
         "unit": "div.wob-unit > span[style='display:inline']",

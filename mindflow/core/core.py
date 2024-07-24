@@ -1,8 +1,9 @@
 from ..core.utils.computer import Computer
-from ..core.utils.llm import LLM, to_lmc
+from ..core.utils.llm import LLM, to_lmc, interpret_input
 from ..core.utils.general import load_settings
 from ..core.utils.extensions import Extensions
 from pathlib import Path
+import asyncio
 import os
 
 class Profile:
@@ -36,6 +37,7 @@ class MindFlow:
             local: bool = False,
             computer = None,
             profile = None,
+            dev = True,
             llm = None,
             tasks = False,
             breakers = ("the task is done.", "the conversation is done.")) -> None:
@@ -43,14 +45,11 @@ class MindFlow:
         # settings
         self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
+        self.dev = dev
         
                 
         # memory + history
-        self.history_dir = Path(Path(__file__).parent, "memory", "history") if history_dir is None else history_dir
-        self.skills_dir = Path(Path(__file__).parent, "memory", "skills") if skills_dir is None else skills_dir
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
-        self.extensions_dir = Path(Path(__file__).parent.parent, "extensions") if extensions_dir is None else extensions_dir
-        
 
         self.extensions = Extensions()
         self.computer = Computer(self.extensions) if computer is None else computer
@@ -71,11 +70,20 @@ class MindFlow:
                                                                  username=self.computer.user,
                                                                  os=self.computer.os)
         
+        self.prompts['interface'] = self.prompts['initial'] + '\n' + self.prompts['interface']
+        
         self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
                                                                                 extensions=self.extensions.load_instructions())
         
-                # utils
+        # utils
+        self.llms = {
+            "interface": None,
+            "computer": None,
+            "ltm": None
+        }
+        self.name = self.settings['assistant']['name']
         self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
+        
         self.tasks = tasks
 
         # logging + debugging
@@ -86,45 +94,60 @@ class MindFlow:
 
         self.llm.messages = [] if messages is None else messages
         
-
-    def chat(self, 
-            message: str = None, 
-            stream: bool = False,
-            timeout=16):
+        self.queue = []
         
-        notebooks = {}
-        lmc = False
+        
+    async def streaming_chat(self, 
+                             message: str = None, 
+                             remember=True,
+                             timeout=16,
+                             lmc=False):
+    
+        response, notebooks = "", {}
         for _ in range(timeout):
-            responses = self.llm.chat(message=message, 
-                                      lmc=lmc)
-            lmc = False
-            conversation = set()
-            
-            for response in responses: 
-                if response.get("type", None) == "message":
-                    conversation.add("message")
-                    yield response
+            async for chunk in self.llm.chat(message=message, 
+                                             stream=True,
+                                             remember=remember, 
+                                             lmc=lmc):
+                response += chunk
+                yield chunk
                 
-                if response.get("type", None) == "code":
-                    language, code = response.get("format", "python"), response.get("content", None)
+            # because of this, it's only partially async
+            # will fix in future versions
+            lmc = False
+            
+            for chunk in interpret_input(response): 
+                if chunk.get("type", None) == "code":
+                    language, code = chunk.get("format"), chunk.get("content")
                     if language in notebooks:
                         notebooks[language] += "\n\n" + code
                     else:
                         notebooks[language] = code
-                    self.computer.md(code, language)
-                    
-                if "let's run the code" in response.get("content").lower():
+                
+                elif "let's run the code" in chunk.get("content").lower():
                     for language, code in notebooks.items():
-                        output = to_lmc(self.computer.run(code, format=language),
-                                            role="computer", format="output")
-                        if output.get("content", None):
-                            yield output
-                            message, lmc = output, True
-                        conversation.add("code")
-                        
-            if not ("code" in conversation) or response.get("content").lower().endswith(self.breakers):
-                notebooks = {}
-                return 
-            
+                        output = self.computer.run(code, format=language, display=False)
+                        message, lmc = to_lmc(output, role="computer", format="output"), True
+                        if self.dev:
+                            yield message
+                    notebooks = {}
+                    
+            response = ""
+            if not lmc or chunk.get("content", "").lower().endswith(self.breakers):
+                return
+    
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
+    
+    async def _gather(self, gen):
+        return await "".join([chunk async for chunk in gen])
 
+    def chat(self, 
+             message: str | None = None, 
+             stream: bool = False,
+             remember: bool = True,
+             lmc: bool = False,
+             timeout=16):
+        
+        gen = self.streaming_chat(message, remember, timeout, lmc)
+        if stream: return gen
+        return asyncio.run(self._gather(self, gen))
