@@ -1,191 +1,235 @@
 import asyncio
 from playwright.async_api import async_playwright
+from playwright_stealth import stealth_async
+
 from markdownify import markdownify as md
 from bs4 import BeautifulSoup
-from pathlib import Path
-from functools import partial
-from playwright_stealth import stealth_async
+
+from pathlib import Path 
+from snova import SnSdk
+import importlib
+import browsers
 import random
-import time
+import json
+import toml
 import re
 
-from .utils.google_snippets import (get_weather, 
-                                   get_showtimes, 
-                                   get_events, 
-                                   get_reviews)
+
+# might publish as a new module
+def filter_markdown(markdown):
+    filtered_lines = []
+    consecutive_new_lines = 0
+    rendered  = re.compile(r'.*\]\(http.*\)')
+    embed_line = re.compile(r'.*\]\(.*\)')
+
+    for line in markdown.split('\n'):
+        line: str = line.strip()
+        
+        if embed_line.match(line) and not rendered.match(line):
+            continue
+        
+        if '[' in line and ']' not in line:
+            line = line.replace('[', '')
+        elif ']' in line and '[' not in line:
+            line = line.replace(']', '')
+        
+        if len(line) > 2:
+            filtered_lines.append(line)
+            consecutive_new_lines = 0
+        elif line == '' and consecutive_new_lines < 1:
+            filtered_lines.append('')
+            consecutive_new_lines += 1
+    
+    return '\n'.join(filtered_lines)
+
+def to_markdown(html, ignore=[], ignore_ids=[], ignore_classes=[], strip=[]): 
+    #html = html.encode('utf-8', 'replace').decode('utf-8')
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Remove elements based on tags
+    for tag in ignore:
+        for element in soup.find_all(tag):
+            element.decompose()
+    
+    # Remove elements based on IDs
+    for id_ in ignore_ids:
+        for element in soup.find_all(id=id_):
+            element.decompose()
+    
+    # Remove elements based on classes
+    for class_ in ignore_classes:
+        for element in soup.find_all(class_=class_):
+            element.decompose()
+    
+    markdown = filter_markdown(md(str(soup), strip=strip))
+    return markdown
 
 class Browser:
-    def __init__(self,
-                 ignore: tuple[str] = None,
-                 headless=True,
-                 bot=True,
-                 mode="perplexity"):
-        
-        self.engines = {"google": {"engine": "https://www.google.com/search?q=",
-                                   "search": {"title": 'h3.LC20lb',
-                                              "description": 'div.r025kc',
-                                              "link": 'div.yuRUbf > div > span > a'},
-                                   # rich snippets (surface level searches)
-                                   "widgets": {"weather": get_weather,
-                                               "showtimes": get_showtimes,
-                                               "events": get_events,
-                                               "reviews": get_reviews}}}
-        
-        self.browser_engine = "google"
-        self.headless = headless
-        self.bot = bot
-        self.mode = mode
-        self.loop = asyncio.get_event_loop()
-        
-        # ignores        
-        self.ignore_words = frozenset(("main menu", "move to sidebar", "navigation", "contribute", "search", "appearance", "tools", "personal tools", "pages for logged out editors", "move to sidebar", "hide", "show", "toggle the table of contents", "general", "actions", "in other projects", "print/export"))
-        self.ignore = ignore if ignore else ("png", "jpg", "jpeg", "svg", "gif", "css", "woff", "woff2", "mp3", "mp4")
-        self.ignore_regex = re.compile(r"\.(" + "|".join(self.ignore) + ")$")
-            
-        # init browser at runtime
-        # for faster speeds in the future
-        self.loop.run_until_complete(self.init_playwright())
-        
-    async def init_playwright(self):
-        self.playwright = await async_playwright().start()
-        
-        # Get user profile path
-        # user_data_dir = self.get_user_data_dir('chrome')  # Change 'chrome' to 'firefox' or 'msedge' as needed
-        #print(f"User profile path: {user_data_dir}")
-        
-        with open(Path(Path(__file__).parent, "src", "user_agents.txt"), "r") as f:
-            agent = random.choice(f.read().split('\n'))
-        
-        # Launch browser with user profile
-        self.browser = await self.playwright.chromium.launch(#user_data_dir=user_data_dir,
-                                                             headless=self.headless)
-        self.context = self.browser.new_context(user_agent=agent)
+    def __init__(self, headless=False):
+        # Temp solution, loads widgets from ALL engines
+        # Should only load widgets from chosen engine
 
-    def get_user_data_dir(self, browser_type):
-        if browser_type == 'firefox':
-            return str(Path.home() / 'AppData' / 'Roaming' / 'Mozilla' / 'Firefox' / 'Profiles')
-        elif browser_type == 'chrome':
-            return str(Path.home() / 'AppData' / 'Local' / 'Google' / 'Chrome' / 'User Data' / 'Default')
-        elif browser_type == 'msedge':
-            return str(Path.home() / 'AppData' / 'Local' / 'Microsoft' / 'Edge' / 'User Data')
-        else:
-            raise Exception(f"Unsupported browser type: {browser_type}")
+        with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
+            self.engines = json.load(f)
+        self.browser_engine = 'google'
         
+        path = ".utils."
+        for engine, data in self.engines.items():
+            module = importlib.import_module(path + engine, package=__package__)
+            self.engines[engine]["widgets"] = {widget: getattr(module, lib) for widget, lib in data["widgets"].items()}
+            
+        self.headless = headless
+        self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct")
+        
+        default_path = Path(__file__).parent / "config.default.toml"
+        if (config_path := Path(__file__).parent / "config.toml").is_file():
+            default_path = config_path
+            
+        with open(default_path, "r") as f:
+            self.settings = toml.load(f)
+            
+        for key, value in self.settings['search'].items():
+            self.settings['search'][key] = frozenset(value)
+    
+        # Init browser at runtime for faster speeds in the future
+        self.loop = asyncio.get_event_loop()
+        self.loop.run_until_complete(self.init_playwright())
+
     async def close_playwright(self):
         await self.browser.close()
         await self.playwright.stop()
+        
+    async def init_playwright(self):
+        installed_browsers = {browser['display_name']:browser
+                              for browser in browsers.browsers()}
+         
+        supported = ("Google Chrome", "Mozilla Firefox", "Microsoft Edge")
+        for browser in supported:
+            if (selected := installed_browsers.get(browser, {})):
+                break
+            
+        self.playwright = await async_playwright().start()
+        with open(Path(Path(__file__).parent, "src", "user_agents.txt"), "r") as f:
+            self.user_agent = random.choice(f.read().split('\n'))
+        
+        path, browser_type = selected.get("path"), selected.get("browser_type", "unknown")
+        self.browser_type = browser_type
+        if (browser_type == "firefox" 
+            or browser_type == "unknown" 
+            or not selected):
 
+            await self.init_gecko()
+        else:
+            await self.init_chromium(browser, path, browser_type)
+    
+        if not self.browser:
+            raise Exception("Browser initialization failed.")
+        
+    async def init_chromium(self, browser, local_browser, browser_type): 
+        # supports user profiles (for saved logins)      
+        # temp solution, use default profile
+        
+        profile_path = Path(Path.home(), "AppData", "Local", *browser.split(), "User Data", "Default")
+        self.browser = await self.playwright.chromium.launch_persistent_context(executable_path=local_browser,
+                                                                                channel=browser_type,
+                                                                                headless=self.headless, 
+                                                                                user_agent=self.user_agent,
+                                                                                user_data_dir=profile_path)
+        
+    async def init_gecko(self): 
+        # doesn't support user profiles
+        # because of playwright bug with gecko based browsers 
+        
+        self.browser = await self.playwright.firefox.launch_persistent_context(headless=self.headless,
+                                                                               user_agent=self.user_agent)
+        
     async def playwright_search(self, 
                                 query: str, 
-                                results: int = 3, 
-                                widget: str = None):
+                                n: int = 3,
+                                engine: str = "google"):
 
         page = await self.browser.new_page()
+        await stealth_async(page)
         
-        # Abort uneccesary requests
-        await page.route(self.ignore_regex, lambda route: route.abort())
-
-        engine = self.engines.get(self.browser_engine, "google")
+        engine = self.engines.get(self.browser_engine, engine)
         await page.goto(engine["engine"] + query) 
 
+        # wacky ahh searching here
         results = ()
-        if widget and (function := engine["widgets"].get(widget, None)):
-            results = ({"widget": await function(page)},)
-
         keys = {key: None for key in engine["search"].keys()}
-        results += tuple(keys.copy() for _ in range(results))
+        results += tuple(keys.copy() for _ in range(n))
         
         for key, selector in engine["search"].items():
-            elements = (await page.query_selector_all(selector))[:results]
+            elements = (await page.query_selector_all(selector))[:n]
             for index, elem in enumerate(elements):
-                if key == "link":
-                    results[index][key] = await elem.get_attribute('href')
-                else:
-                    results[index][key] = await elem.inner_text()
+                results[index][key] = (await elem.get_attribute('href') 
+                                       if key == "link" 
+                                       else await elem.inner_text())
 
-        await page.close()
-        return results if len(results) > 1 else results[0]
-    
-    async def perplexity_search(self, query):
-        page = await self.context.new_page()
-        await stealth_async(page)
-        await page.goto("https://www.perplexity.ai/")
-        
-        #  await asyncio.sleep(300)
-        
-        
-        # Enter query
-        print("ATTEMPTING!")
-        await page.wait_for_selector('textarea[placeholder="Ask anything..."]')
-        print("PASSED!")
-        await page.fill('textarea[placeholder="Ask anything..."]', query)
-        await page.click('button[aria-label="Submit"]')
-        
-        # Extract results
-        await page.click('button[data-icon="clipboard"]')
-        results = await page.evaluate('navigator.clipboard.readText()')
-        
-        # Close the browser
         await page.close()
         return results
-
-    def search(self, query: str, n: int = 3, parallel=False, mode="perplexity", widget=None):
-        if mode == "playwright":
-            search = self.playwright_search(query, n, widget)
-
-        elif mode == "perplexity":
-            search = self.perplexity_search(query)
-            
-        if parallel:
-            return search
-        return self.loop.run_until_complete(search)
+    
+    async def playwright_load(self, url, clean: bool = False):
+        page = await self.browser.new_page()
+        await stealth_async(page)
+        await page.goto(url) 
         
+        if clean:
+            body = await page.query_selector('body')
+            html = await body.inner_html() 
+            
+            contents = to_markdown(html, 
+                                   ignore=['header', 'footer', 'nav', 'navbar'],
+                                   ignore_classes=['footer']).strip()
+            return contents
+        return await page.content()
+
+    def search(self,
+               query: str,
+               n: int = 3,
+               cite: bool = False,
+               engine: str = "google"):
+        
+        # search like perplexity.ai
+        # v1, will use embeddings in future 
+        # versions to save money
+        
+        sites = self.loop.run_until_complete(self.playwright_search(query, n, engine))
+        results = self.parallel(*(self.playwright_load(url=site["link"], clean=True) for site in sites))
+        
+        prompt = self.settings["prompts"]["summarise"] + (self.settings["prompts"]["citations"] if cite else "")
+        result = self.llm.chat("\n\n".join(results), 
+                               role="browser",
+                               system=prompt)
+        return result
+    
+    def widget_search(self,
+                      query: str,
+                      widget: str,
+                      engine: str = "google") -> dict:
+        return self.loop.run_until_complete(self.run_widget_search(query, widget, engine))
+    
+    async def run_widget_search(self,
+                            query: str,
+                            widget: str,
+                            engine: str = "google") -> dict:
+        
+        page = await self.browser.new_page()
+        await stealth_async(page)
+        
+        engine = self.engines.get(self.browser_engine, {})
+        await page.goto(engine["engine"] + query) 
+        
+        results = {"error": "Requested widget is unsupported."}
+        if (function := engine.get("widgets", {}).get(widget, None)):
+            results = await function(self, page)
+        
+        await page.close() 
+        return results
+    
     def parallel(self, *funcs):
         return self.loop.run_until_complete(self.run_parallel(*funcs))
         
     async def run_parallel(self, *funcs):
-        tasks = tuple(partial(func, *args, parallel=True)() for func, args in funcs)
-        return tuple(await asyncio.gather(*tasks))
+        return tuple(await asyncio.gather(*funcs))
 
-    def load_search(self, result: dict, clean: bool = True):
-        site = self.loop.run_until_complete(self.load_site(result["link"], clean))
-        return site
-    
-    def results_filter(self, results: list):
-        if self.browser_engine == "google":
-            title, link, desc = "title", "link", "snippet"
-            
-        return [{"title": result[title],
-                 "link": result[link],
-                 "description": result[desc]} for result in results]
-
-    async def to_markdown(self, html: str) -> str:
-        alphabet = "abcdefghijklmnopqrztuvwxyz"
-        markdown_content = md(html, heading_style="ATX")
-            
-        # Ensure new lines are at a max of 2 each time
-        content = '\n\n'.join([line.strip() for line in markdown_content.split('\n')
-                                if len(line.strip()) > 2 and not (line.strip().lower() in self.ignore_words) and not("*  *  *" in line) and any(i in {*line.lower()} for i in alphabet)])
-        
-        # Detect and remove weird patterns using regex
-        return content
-
-    async def load_site(self, site: str, clean: bool = True):
-        page = await self.browser.new_page()
-        await page.goto(site)
-        if clean:
-            body = await page.query_selector('body')
-            html = await body.inner_html()
-            # Parse the HTML content
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            # Remove footer and a tags
-            for footer in soup.find_all('footer'):
-                footer.decompose()
-            for a in soup.find_all('a'):
-                a.decompose()
-            
-            web_context = await self.to_markdown(str(soup))
-            return web_context
-        else:
-            return await page.content()

@@ -1,0 +1,16 @@
+{
+    "google": {
+        "engine": "https://www.google.com/search?q=",
+        "search": {
+            "title": "h3.LC20lb",
+            "description": "div.r025kc",
+            "link": "div.yuRUbf > div > span > a"
+        },
+        "widgets": {
+            "weather": "get_weather",
+            "showtimes": "get_showtimes",
+            "events": "get_events",
+            "reviews": "get_reviews"
+        }
+    }
+}

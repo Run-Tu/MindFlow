@@ -1,13 +1,14 @@
-async def get_events(page):
+async def get_events(self, page):
     classnames = {
         "title": "div.YOGjf",
         "location": "div.zvDXNd",
         "time": "div.SHrHx > div.cEZxRc:not(.zvDXNd)"
     }
 
-    button = "div.MmMIvd"
-    expanded = "div#Q5Vznb"
+    button = "div.ZFiwCf" 
+    expanded = "div.MmMIvd" if self.browser_type == "chrome" else "div.ZFiwCf"
     popup = "g-raised-button.Hg3NO"
+    
     #await page.wait_for_selector(popup)
     #buttons = await page.query_selector_all(popup)
     #await buttons[1].click()
@@ -34,7 +35,7 @@ async def get_events(page):
 
     return events
 
-async def get_showtimes(page):
+async def get_showtimes(self, page):
     classnames = {
         "venue": "div.YS9glc > div:not([class])",
         "location": "div.O4B9Zb"
@@ -70,11 +71,11 @@ async def get_showtimes(page):
             
             times = await plan.query_selector_all(times_selector)
             events[index][mode_text] = [await time.inner_text() for time in times]
-
+        
     return events
 
 
-async def get_reviews(page):
+async def get_reviews(self, page):
     classnames = {
         "site": "span.rhsB",
         "rating": "span.gsrt"
@@ -97,7 +98,7 @@ async def get_reviews(page):
 
     return events
 
-async def get_weather(page):
+async def get_weather(self, page):
     classnames = {
         "condition": "span#wob_dc",
         "time": "div#wob_dts",

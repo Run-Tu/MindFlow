@@ -1,0 +1,7 @@
+[prompts]
+summarise="You are a web search specialist and your duty is to summarise researched information from the browser into 2 to 3 paragraphs in markdown. You may use bullet points and other markdown formatting to convey the summary. Summarise the following."
+citations=""
+
+[search]
+ignore_resources=["png", "jpg", "jpeg", "svg", "gif", "css", "woff", "woff2", "mp3", "mp4"]
+ignore_words=["main menu", "move to sidebar", "navigation", "contribute", "search", "appearance", "tools", "personal tools", "pages for logged out editors", "move to sidebar", "hide", "show", "toggle the table of contents", "general", "actions", "in other projects", "print/export"]
