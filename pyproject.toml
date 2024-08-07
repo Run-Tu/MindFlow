@@ -22,6 +22,7 @@ asyncio="*"
 markdownify="*"
 beautifulsoup4="*"
 pybrowsers="*"
+chromadb="*"
 
 [tool.poetry.scripts]
 macro = "mindflow.__main__:main"

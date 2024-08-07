@@ -51,7 +51,7 @@ class MindFlow:
         # memory + history
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
 
-        self.extensions = Extensions()
+        self.extensions = Extensions(self)
         self.computer = Computer(self.extensions) if computer is None else computer
         
 
@@ -94,7 +94,7 @@ class MindFlow:
 
         self.llm.messages = [] if messages is None else messages
         
-        self.queue = []
+        self.loop = asyncio.get_event_loop()
         
         
     async def streaming_chat(self, 
@@ -150,4 +150,4 @@ class MindFlow:
         
         gen = self.streaming_chat(message, remember, timeout, lmc)
         if stream: return gen
-        return asyncio.run(self._gather(self, gen))
+        return self.loop.run_until_complete(self._gather(self, gen))

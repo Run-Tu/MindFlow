@@ -6,7 +6,7 @@ import sys
 import importlib
 
 class Extensions:
-    def __init__(self):
+    def __init__(self, mindflow):
         self.extensions_dir = Path(ROOT_DIR, "extensions")
         self.extensions = []
         self.instructions = {}
@@ -36,7 +36,7 @@ class Extensions:
                     sys.modules[extension.name] = module
                     spec.loader.exec_module(module)
 
-                    setattr(self, extension.name, getattr(module, extension.name.title())())
+                    setattr(self, extension.name, getattr(module, extension.name.title())(*mindflow))
                     self.extensions.append(extension.name)
                     with open(extension / config["instructions"], "r") as f:
                         self.instructions[extension.name] = f.read()
