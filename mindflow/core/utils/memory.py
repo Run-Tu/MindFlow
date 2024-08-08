@@ -5,17 +5,17 @@ class VectorDB:
     def __init__(self, 
                  name: str,
                  location: str = '',
-                 in_memory: bool = False,):
+                 persistent: bool = False,):
 
         self.name = name
         self.location = Path(location)
-        if in_memory:
-            self.client = chromadb.client()
-        else:
-            self.setup_persistence()  
+        if persistent:
+            self.setup_persistent()  
             self.client = chromadb.PersistentClient(self.location)
+        else:
+            self.client = chromadb.client()
         
-    def setup_persistence(self):
+    def setup_persistent(self):
         if self.location.is_dir():
             location /= f"{self.name}.db"
         if not self.location.is_file():

@@ -2,9 +2,11 @@ from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc, interpret_input
 from ..core.utils.general import load_settings
 from ..core.utils.extensions import Extensions
+from ..core.utils.memory import VectorDB
 from pathlib import Path
 import asyncio
 import os
+import re
 
 class Profile:
     """
@@ -32,6 +34,7 @@ class MindFlow:
             history_dir: Path | None = None,
             skills_dir: Path | None = None,
             prompts_dir: Path | None = None,
+            memories_dir: Path | None = None,
             extensions_dir: Path | None= None,
             verbose: bool = False,
             local: bool = False,
@@ -39,63 +42,63 @@ class MindFlow:
             profile = None,
             dev = True,
             llm = None,
-            tasks = False,
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
         # settings
         self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
         self.dev = dev
-        
                 
-        # memory + history
+        # setup paths
         self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
-
+        self.memories_dir = Path(Path(__file__).parent, "memories") if memories_dir is None else memories_dir
+        self.extensions_dir = Path(Path(__file__).parent.parent, "extensions") if extensions_dir is None else extensions_dir
+        
+        # setup other instances
         self.extensions = Extensions(self)
         self.computer = Computer(self.extensions) if computer is None else computer
         
-
-        # experimental
+        # setup memory
+        self.ltm = VectorDB(name="ltm", 
+                            location=self.memories_dir,
+                            persistent=True)
+        self.context_memories = []
+        
+        # experimental (not yet implemented)
         self.local = local
 
-        # prompts
+        # setup prompts
         self.prompts = {}
+        self.info = {
+            "assistant": self.settings['assistant']['name'],
+            "personality": self.settings['assistant']['personality'],
+            "username": self.computer.user,
+            "os": self.computer.os,
+            "supported": self.computer.supported,
+            "extensions": self.extensions.load_instructions()
+        }
+
         prompts = os.listdir(self.prompts_dir)
         for filename in prompts:
             with open(Path(self.prompts_dir, filename), "r") as f:
-                self.prompts[filename.split('.')[0]] = f.read().strip()
+                name = filename.split('.')[0]
+                self.prompts[name] = f.read().strip()
+            self.prompts[name].format(**{replace:self.info.get(replace) 
+                                         for replace in re.findall(r'\{(.*?)\}', self.prompts[name])})
+    
+        self.prompts['initial'] += "\n\n" + self.prompts['instructions']
         
-        self.prompts['initial'] = self.prompts['initial'].format(assistant=self.settings['assistant']['name'],
-                                                                 personality=self.settings['assistant']['personality'],
-                                                                 username=self.computer.user,
-                                                                 os=self.computer.os)
-        
-        self.prompts['interface'] = self.prompts['initial'] + '\n' + self.prompts['interface']
-        
-        self.prompts['initial'] += "\n\n" + self.prompts['instructions'].format(supported=self.computer.supported,
-                                                                                extensions=self.extensions.load_instructions())
-        
-        # utils
-        self.llms = {
-            "interface": None,
-            "computer": None,
-            "ltm": None
-        }
-        self.name = self.settings['assistant']['name']
+        # setup llm
+        self.name = self.info['name']
         self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
+        self.llm.messages = [] if messages is None else messages
+        self.loop = asyncio.get_event_loop()
         
-        self.tasks = tasks
-
         # logging + debugging
         self.verbose = verbose
         
         # loop breakers
         self.breakers = breakers
-
-        self.llm.messages = [] if messages is None else messages
-        
-        self.loop = asyncio.get_event_loop()
-        
         
     async def streaming_chat(self, 
                              message: str = None, 
