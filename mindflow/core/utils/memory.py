@@ -13,7 +13,7 @@ class VectorDB:
             self.setup_persistent()  
             self.client = chromadb.PersistentClient(self.location)
         else:
-            self.client = chromadb.client()
+            self.client = chromadb.Client()
         
     def setup_persistent(self):
         if self.location.is_dir():

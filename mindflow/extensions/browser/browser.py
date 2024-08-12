@@ -65,9 +65,13 @@ def to_markdown(html, ignore=[], ignore_ids=[], ignore_classes=[], strip=[]):
     return markdown
 
 class Browser:
-    def __init__(self, headless=False):
+    def __init__(self, mindflow, headless=False):
         # Temp solution, loads widgets from ALL engines
         # Should only load widgets from chosen engine
+        
+        # points to current mindflow instance
+        self.mindflow = mindflow
+        self.context = mindflow.context_memory.global_collection
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
             self.engines = json.load(f)
@@ -169,20 +173,37 @@ class Browser:
         await page.close()
         return results
     
-    async def playwright_load(self, url, clean: bool = False):
+    async def playwright_load(self, url, clean: bool = False, to_context=False):
         page = await self.browser.new_page()
         await stealth_async(page)
         await page.goto(url) 
         
-        if clean:
-            body = await page.query_selector('body')
-            html = await body.inner_html() 
+        if not clean:
+            return await page.content()
+        
+        body = await page.query_selector('body')
+        html = await body.inner_html() 
+        
+        contents = to_markdown(html, 
+                                ignore=['header', 'footer', 'nav', 'navbar'],
+                                ignore_classes=['footer']).strip()
             
-            contents = to_markdown(html, 
-                                   ignore=['header', 'footer', 'nav', 'navbar'],
-                                   ignore_classes=['footer']).strip()
-            return contents
-        return await page.content()
+        # CONCEPT
+        # add to short-term mindflow vectordb 
+        # acts like a cache and local search engine
+        # for previous web searches
+        # uses embeddings to view relevant searches
+        if to_context:
+            # temp, will improve
+            contents = contents.split("###")
+            self.context.add(
+                documents=contents,
+                metadatas=[{"source": "browser"} for _ in range(len(contents))], # filter on these!
+                ids=[f"doc{i}" for i in range(len(contents))], # unique for each doc
+            )
+            
+        return contents
+
 
     def search(self,
                query: str,
@@ -195,7 +216,7 @@ class Browser:
         # versions to save money
         
         sites = self.loop.run_until_complete(self.playwright_search(query, n, engine))
-        results = self.parallel(*(self.playwright_load(url=site["link"], clean=True) for site in sites))
+        results = self.parallel(*(self.playwright_load(url=site["link"], clean=True, to_context=True) for site in sites))
         
         prompt = self.settings["prompts"]["summarise"] + (self.settings["prompts"]["citations"] if cite else "")
         result = self.llm.chat("\n\n".join(results), 

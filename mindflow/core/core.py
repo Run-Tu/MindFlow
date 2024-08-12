@@ -62,7 +62,8 @@ class MindFlow:
         self.ltm = VectorDB(name="ltm", 
                             location=self.memories_dir,
                             persistent=True)
-        self.context_memories = []
+        self.context_memory = VectorDB(name="context")
+        self.global_collection = self.context_memory.create_collection("global")
         
         # experimental (not yet implemented)
         self.local = local
