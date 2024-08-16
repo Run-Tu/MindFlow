@@ -36,7 +36,7 @@ class Extensions:
                     sys.modules[extension.name] = module
                     spec.loader.exec_module(module)
 
-                    setattr(self, extension.name, getattr(module, extension.name.title())(*mindflow))
+                    setattr(self, extension.name, getattr(module, extension.name.title())(mindflow=mindflow))
                     self.extensions.append(extension.name)
                     with open(extension / config["instructions"], "r") as f:
                         self.instructions[extension.name] = f.read()
@@ -54,6 +54,7 @@ class Extensions:
                         
                 except Exception as e:
                     print(f"Failed to import extension '{extension.name}': {e}")
+                    loading = False
             
     def load_instructions(self) -> str:
         return "\n".join(f"# {name} EXTENSION\n{instructions}" for name, instructions in self.instructions.items())

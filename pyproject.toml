@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "mindflow"
-version = "0.1.6"
+version = "0.1.7"
 description = "Multimodal Assistant. Human Interface for computers."
 authors = ["Run Tu <run-tu@gmail.com>"]
 license = "MIT"
@@ -16,7 +16,7 @@ python = "^3.8,<4.0"
 gradio_client = ">=1.3.0" 
 toml = ">=0.10"
 rich = ">=10.0"
-snova = ">=0.1.0"
+snova = ">=0.1.1"
 playwright="*"
 asyncio="*"
 markdownify="*"

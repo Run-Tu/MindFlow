@@ -59,11 +59,11 @@ class MindFlow:
         self.computer = Computer(self.extensions) if computer is None else computer
         
         # setup memory
-        self.ltm = VectorDB(name="ltm", 
-                            location=self.memories_dir,
-                            persistent=True)
-        self.context_memory = VectorDB(name="context")
-        self.global_collection = self.context_memory.create_collection("global")
+        # self.ltm = VectorDB(name="ltm", 
+        #                     location=self.memories_dir,
+        #                     persistent=True)
+        # self.context_memory = VectorDB(name="context")
+        # self.global_collection = self.context_memory.create_collection("global")
         
         # experimental (not yet implemented)
         self.local = local
@@ -84,13 +84,13 @@ class MindFlow:
             with open(Path(self.prompts_dir, filename), "r") as f:
                 name = filename.split('.')[0]
                 self.prompts[name] = f.read().strip()
-            self.prompts[name].format(**{replace:self.info.get(replace) 
-                                         for replace in re.findall(r'\{(.*?)\}', self.prompts[name])})
-    
+            self.prompts[name] = self.prompts[name].format(**{replace:self.info.get(replace) 
+                                                              for replace in re.findall(r'\{(.*?)\}', self.prompts[name])})
+
         self.prompts['initial'] += "\n\n" + self.prompts['instructions']
-        
+            
         # setup llm
-        self.name = self.info['name']
+        self.name = self.info['assistant']
         self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
         self.llm.messages = [] if messages is None else messages
         self.loop = asyncio.get_event_loop()
