@@ -74,7 +74,7 @@ class LLM:
         # use SnSdk
         self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct",
                          remember=True,
-                         priority=2,
+                         priority=0,
                          system=self.system,
                          messages=[] if messages is None else messages)
         self.messages = self.llm.messages

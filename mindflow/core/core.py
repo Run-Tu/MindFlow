@@ -2,7 +2,9 @@ from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc, interpret_input
 from ..core.utils.general import load_settings
 from ..core.utils.extensions import Extensions
-from ..core.utils.memory import VectorDB
+import chromadb
+from chromadb.config import Settings
+
 from pathlib import Path
 import asyncio
 import os
@@ -59,11 +61,10 @@ class MindFlow:
         self.computer = Computer(self.extensions) if computer is None else computer
         
         # setup memory
-        # self.ltm = VectorDB(name="ltm", 
-        #                     location=self.memories_dir,
-        #                     persistent=True)
-        # self.context_memory = VectorDB(name="context")
-        # self.global_collection = self.context_memory.create_collection("global")
+        location = Path(self.memories_dir, "ltm")
+        self.ltm = chromadb.PersistentClient(str(location), Settings(anonymized_telemetry=False))    
+        self.stm = chromadb.Client(Settings(anonymized_telemetry=False))
+        self.collection = self.stm.create_collection("global")
         
         # experimental (not yet implemented)
         self.local = local
