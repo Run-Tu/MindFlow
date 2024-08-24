@@ -15,12 +15,7 @@ class Profile:
     store apikeys here. this is temp since its a bad setup omg.
     """
     def __init__(self, config_file= None, keys: dict ={}):
-        
         self.settings = load_settings(file=config_file)
-        self.keys = keys
-        if not keys:
-            self.keys = self.settings["defaults"]
-            
             
     def __str__(self):
         return f'Profile({self.keys})'

@@ -1,6 +1,8 @@
 from markdownify import markdownify as md
 from bs4 import BeautifulSoup
 import numpy as np
+import random
+import string
 import re
 
 # might publish as a new module
@@ -70,3 +72,7 @@ def get_relevant(document: dict, threshold: int = 1.125, clean=False):
     if clean:
         document = "\n\n".join(np.array(document["documents"]).flatten().tolist())
     return document
+
+def uid(length=6):
+    characters = string.ascii_letters + string.digits + '-'
+    return ''.join(random.choice(characters) for _ in range(length))

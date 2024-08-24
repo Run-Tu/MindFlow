@@ -3,7 +3,7 @@ from playwright.async_api import async_playwright
 from playwright_stealth import stealth_async
 
 from pathlib import Path 
-from .utils.general import to_markdown, get_relevant
+from .utils.general import to_markdown, get_relevant, uid
 from snova import SnSdk
 import importlib
 import browsers
@@ -141,12 +141,14 @@ class Browser:
         # for previous web searches
         # uses embeddings to view relevant searches
         if to_context:
-        #     # temp, will improve
+            # temp, will improve
             contents = contents.split("###")
             self.mindflow.collection.add(
                 documents=contents,
-                metadatas=[{"source": "browser"} for _ in range(len(contents))], # filter on these!
-                ids=[f"doc{i}" for i in range(len(contents))], # unique for each doc
+                metadatas=[{"source": "browser"} 
+                           for _ in range(len(contents))], # filter on these!
+                ids=[f"doc-{uid()}" 
+                     for _ in range(len(contents))], # unique for each doc
             )
         
         if not void:
