@@ -1,6 +1,5 @@
 import asyncio
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
 
 from pathlib import Path 
 from .utils.general import to_markdown, get_relevant, uid
@@ -17,8 +16,7 @@ class Browser:
         # Should only load widgets from chosen engine
         
         # points to current mindflow instance
-        self.mindflow = mindflow
-        #self.collection = mindflow.collection
+        self.mindflow = mindflow        
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
             self.engines = json.load(f)
@@ -29,7 +27,7 @@ class Browser:
             module = importlib.import_module(path + engine, package=__package__)
             self.engines[engine]["widgets"] = {widget: getattr(module, lib) for widget, lib in data["widgets"].items()}
             
-        self.headless = headless
+        self.headless = True if (not headless) else (not mindflow.verbose)
         self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct")
         
         default_path = Path(__file__).parent / "config.default.toml"
@@ -93,43 +91,94 @@ class Browser:
         
         self.browser = await self.playwright.firefox.launch_persistent_context(headless=self.headless,
                                                                                user_agent=self.user_agent)
+    
+    async def check_visibility_while_waiting(self, page, check_selector, wait_selector, timeout=30000):
+        # start time
+        start_time = asyncio.get_event_loop().time()
         
+        while True:
+            # check if the element is visible
+            is_visible = await page.is_visible(check_selector)
+            
+            # if the element is visible, return True
+            if is_visible:
+                return True
+            
+            # check if the wait_selector is visible
+            try:
+                return await page.wait_for_selector(wait_selector, state='visible', timeout=1000)
+            except: pass  # wait_selector did not appear within the timeout
+            
+            # check if the timeout has been reached
+            if asyncio.get_event_loop().time() - start_time > timeout / 1000:
+                break
+        
+        return False  # Timeout reached, return False
+    
+    def perplexity_search(self, query: str): 
+        return self.loop.run_until_complete(self.run_perplexity_search(query))
+        
+    async def run_perplexity_search(self, query: str): 
+        page = await self.browser.new_page()
+        text = ""
+        try:
+            await page.goto("https://www.perplexity.ai/search/new?q=" + query)
+            copy = await self.check_visibility_while_waiting(page,
+                                                            '.zone-name-title', # cloudflare
+                                                            '.flex.items-center.gap-x-xs > button:first-child') # perplexity
+            
+            # cloudflare auth is blocking perplexity :(
+            if copy is True:
+                await page.close()  
+                return ""
+            
+            await copy.click()
+            
+            text = await page.evaluate('navigator.clipboard.readText()')
+        finally:
+            await page.close() 
+        return text
+        
+    
     async def playwright_search(self, 
                                 query: str, 
                                 n: int = 3,
                                 engine: str = "google"):
 
+
         page = await self.browser.new_page()
-        await stealth_async(page)
-        
-        engine = self.engines.get(self.browser_engine, engine)
-        await page.goto(engine["engine"] + query) 
+        results = (f"Error: An error occured with {engine} search.",)
+        try:
+            engine = self.engines.get(self.browser_engine, engine)
+            await page.goto(engine["engine"] + query) 
 
-        # wacky ahh searching here
-        results = ()
-        keys = {key: None for key in engine["search"].keys()}
-        results += tuple(keys.copy() for _ in range(n))
-        
-        for key, selector in engine["search"].items():
-            elements = (await page.query_selector_all(selector))[:n]
-            for index, elem in enumerate(elements):
-                results[index][key] = (await elem.get_attribute('href') 
-                                       if key == "link" 
-                                       else await elem.inner_text())
-
-        await page.close()
+            # wacky ahh searching here
+            results = ()
+            keys = {key: None for key in engine["search"].keys()}
+            results += tuple(keys.copy() for _ in range(n))
+            
+            for key, selector in engine["search"].items():
+                elements = (await page.query_selector_all(selector))[:n]
+                for index, elem in enumerate(elements):
+                    results[index][key] = (await elem.get_attribute('href') 
+                                        if key == "link" 
+                                        else await elem.inner_text())
+        finally:
+            await page.close()
         return results
     
     async def playwright_load(self, url, clean: bool = False, to_context=False, void=False):
         page = await self.browser.new_page()
-        await stealth_async(page)
-        await page.goto(url) 
-        
-        if not clean:
-            return await page.content()
-        
-        body = await page.query_selector('body')
-        html = await body.inner_html() 
+        try:
+            await page.goto(url) 
+            
+            if not clean:
+                return await page.content()
+            
+            body = await page.query_selector('body')
+            html = await body.inner_html() 
+        finally:
+            await page.close()
         
         contents = to_markdown(html, 
                                 ignore=['header', 'footer', 'nav', 'navbar'],
@@ -140,6 +189,10 @@ class Browser:
         # acts like a cache and local search engine
         # for previous web searches
         # uses embeddings to view relevant searches
+        
+        # will actually use a temp collection
+        # stm should act like a cache
+        
         if to_context:
             # temp, will improve
             contents = contents.split("###")
@@ -159,11 +212,23 @@ class Browser:
                query: str,
                n: int = 3,
                cite: bool = False,
-               engine: str = "google"):
+               engine: str = "google",
+               local: bool = False):
         
-        # search like perplexity.ai
-        # v1, will use embeddings in future 
-        # versions to save money
+        # TODO: add a cache
+        
+        # search WITH perplexity.ai
+        if not local:
+            # what is this error handling ;^;
+            try: 
+                if (result := self.perplexity_search(query)):
+                    return result
+            except: pass
+            
+                
+        # FALLBACK
+        # search LIKE perplexity.ai (locally)
+        # uses embeddings :D
         
         sites = self.loop.run_until_complete(self.playwright_search(query, n, engine))
         self.parallel(*(self.playwright_load(url=site["link"], 
@@ -181,12 +246,26 @@ class Browser:
                                role="browser",
                                system=prompt)
         return result
+
     
     def widget_search(self,
                       query: str,
                       widget: str,
                       engine: str = "google") -> dict:
-        return self.loop.run_until_complete(self.run_widget_search(query, widget, engine))
+
+        try:
+            results = self.loop.run_until_complete(self.run_widget_search(query, widget, engine))
+        except:
+            results = {"error": "An error occured, results are fallback from perplexity.ai."}
+        
+        # fallback to perplexityy
+        if not results or results.get("error"):
+            results |= {"results": self.loop.run_until_complete(self.run_perplexity_search(query))}
+            
+            if not results["results"]:
+                return {"error": "It seems like your query does not show any widgets."}
+            
+        return results
     
     async def run_widget_search(self,
                             query: str,
@@ -194,17 +273,16 @@ class Browser:
                             engine: str = "google") -> dict:
         
         page = await self.browser.new_page()
-        await stealth_async(page)
-        
         engine = self.engines.get(self.browser_engine, {})
         await page.goto(engine["engine"] + query) 
-        
-        results = {"error": "Requested widget is unsupported."}
-        if (function := engine.get("widgets", {}).get(widget, None)):
-            results = await function(self, page)
+        try:
+            if (function := engine.get("widgets", {}).get(widget, None)):
+                results = (await function(self, page)) or {}
+        except:
+            results = {"error": "An error occured, results are fallback from perplexity.ai."}
         
         await page.close() 
-        return results if results else "Error: It seems like your query does not show any widgets."
+        return results
     
     def parallel(self, *funcs, void=False):
         if not void:

@@ -41,6 +41,13 @@ class MindFlow:
             llm = None,
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
+        
+        # logging + debugging
+        self.verbose = verbose
+        
+        # loop breakers
+        self.breakers = breakers
+        
         # settings
         self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
@@ -90,12 +97,6 @@ class MindFlow:
         self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
         self.llm.messages = [] if messages is None else messages
         self.loop = asyncio.get_event_loop()
-        
-        # logging + debugging
-        self.verbose = verbose
-        
-        # loop breakers
-        self.breakers = breakers
         
     async def streaming_chat(self, 
                              message: str = None, 
