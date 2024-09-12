@@ -94,7 +94,7 @@ class MindFlow:
             
         # setup llm
         self.name = self.info['assistant']
-        self.llm = LLM(self.profile, messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
+        self.llm = LLM(messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
         self.llm.messages = [] if messages is None else messages
         self.loop = asyncio.get_event_loop()
         

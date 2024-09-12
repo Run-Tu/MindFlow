@@ -2,8 +2,9 @@ import asyncio
 from playwright.async_api import async_playwright
 
 from pathlib import Path 
+from mindflow.core.utils.llm import LLM
+
 from .utils.general import to_markdown, get_relevant, uid
-from snova import SnSdk
 import importlib
 import browsers
 import random
@@ -17,6 +18,7 @@ class Browser:
         
         # points to current mindflow instance
         self.mindflow = mindflow        
+        self.llm = LLM()
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
             self.engines = json.load(f)
@@ -28,7 +30,6 @@ class Browser:
             self.engines[engine]["widgets"] = {widget: getattr(module, lib) for widget, lib in data["widgets"].items()}
             
         self.headless = True if (not headless) else (not mindflow.verbose)
-        self.llm = SnSdk("Meta-Llama-3.1-405B-Instruct")
         
         default_path = Path(__file__).parent / "config.default.toml"
         if (config_path := Path(__file__).parent / "config.toml").is_file():
@@ -93,52 +94,42 @@ class Browser:
                                                                                user_agent=self.user_agent)
     
     async def check_visibility_while_waiting(self, page, check_selector, wait_selector, timeout=30000):
-        # start time
         start_time = asyncio.get_event_loop().time()
-        
-        while True:
-            # check if the element is visible
-            is_visible = await page.is_visible(check_selector)
-            
-            # if the element is visible, return True
-            if is_visible:
+        end_time = start_time + timeout / 1000
+
+        while asyncio.get_event_loop().time() < end_time:
+            if await page.is_visible(check_selector):
                 return True
             
-            # check if the wait_selector is visible
             try:
                 return await page.wait_for_selector(wait_selector, state='visible', timeout=1000)
-            except: pass  # wait_selector did not appear within the timeout
-            
-            # check if the timeout has been reached
-            if asyncio.get_event_loop().time() - start_time > timeout / 1000:
-                break
-        
+            except:
+                pass  # wait_selector did not appear within the timeout
+
         return False  # Timeout reached, return False
+
     
     def perplexity_search(self, query: str): 
         return self.loop.run_until_complete(self.run_perplexity_search(query))
         
     async def run_perplexity_search(self, query: str): 
-        page = await self.browser.new_page()
-        text = ""
-        try:
-            await page.goto("https://www.perplexity.ai/search/new?q=" + query)
-            copy = await self.check_visibility_while_waiting(page,
-                                                            '.zone-name-title', # cloudflare
-                                                            '.flex.items-center.gap-x-xs > button:first-child') # perplexity
-            
-            # cloudflare auth is blocking perplexity :(
-            if copy is True:
-                await page.close()  
+        async with await self.browser.new_page() as page:
+            try:
+                await page.goto("https://www.perplexity.ai/search/new?q=" + query)
+                copy = await self.check_visibility_while_waiting(page,
+                                                                '.zone-name-title',  # cloudflare
+                                                                '.flex.items-center.gap-x-xs > button:first-child')  # perplexity
+                
+                # cloudflare auth is blocking perplexity :(
+                if isinstance(copy, bool):
+                    return ""
+                
+                await copy.click()
+                text = await page.evaluate('navigator.clipboard.readText()')
+            except Exception as e: # will add proper error handling
                 return ""
-            
-            await copy.click()
-            
-            text = await page.evaluate('navigator.clipboard.readText()')
-        finally:
-            await page.close() 
         return text
-        
+
     
     async def playwright_search(self, 
                                 query: str, 
@@ -146,9 +137,9 @@ class Browser:
                                 engine: str = "google"):
 
 
-        page = await self.browser.new_page()
         results = (f"Error: An error occured with {engine} search.",)
-        try:
+        async with await self.browser.new_page() as page:
+    
             engine = self.engines.get(self.browser_engine, engine)
             await page.goto(engine["engine"] + query) 
 
@@ -163,13 +154,11 @@ class Browser:
                     results[index][key] = (await elem.get_attribute('href') 
                                         if key == "link" 
                                         else await elem.inner_text())
-        finally:
-            await page.close()
+
         return results
     
     async def playwright_load(self, url, clean: bool = False, to_context=False, void=False):
-        page = await self.browser.new_page()
-        try:
+        async with await self.browser.new_page() as page:
             await page.goto(url) 
             
             if not clean:
@@ -177,8 +166,6 @@ class Browser:
             
             body = await page.query_selector('body')
             html = await body.inner_html() 
-        finally:
-            await page.close()
         
         contents = to_markdown(html, 
                                 ignore=['header', 'footer', 'nav', 'navbar'],
@@ -218,13 +205,8 @@ class Browser:
         # TODO: add a cache
         
         # search WITH perplexity.ai
-        if not local:
-            # what is this error handling ;^;
-            try: 
-                if (result := self.perplexity_search(query)):
-                    return result
-            except: pass
-            
+        if not local and (result := self.perplexity_search(query)):
+            return result
                 
         # FALLBACK
         # search LIKE perplexity.ai (locally)
@@ -237,11 +219,15 @@ class Browser:
                                              void=True)
                         for site in sites))
                     
+        n = n*3 if 10 > n*3 else 9
         relevant = get_relevant(self.mindflow.collection.query(query_texts=[query], 
-                                                                n_results=3),
+                                                                n_results=n),
                                 clean=True)
         
-        prompt = self.settings["prompts"]["summarise"] + (self.settings["prompts"]["citations"] if cite else "")
+        prompt = self.settings["prompts"]["summarise"] 
+        if cite:
+            prompt += self.settings["prompts"]["citations"]
+        
         result = self.llm.chat(relevant, 
                                role="browser",
                                system=prompt)
@@ -253,10 +239,7 @@ class Browser:
                       widget: str,
                       engine: str = "google") -> dict:
 
-        try:
-            results = self.loop.run_until_complete(self.run_widget_search(query, widget, engine))
-        except:
-            results = {"error": "An error occured, results are fallback from perplexity.ai."}
+        results = self.loop.run_until_complete(self.run_widget_search(query, widget, engine))
         
         # fallback to perplexityy
         if not results or results.get("error"):
@@ -268,21 +251,21 @@ class Browser:
         return results
     
     async def run_widget_search(self,
-                            query: str,
-                            widget: str,
-                            engine: str = "google") -> dict:
+                                query: str,
+                                widget: str,
+                                engine: str = "google") -> dict:
         
-        page = await self.browser.new_page()
         engine = self.engines.get(self.browser_engine, {})
-        await page.goto(engine["engine"] + query) 
-        try:
-            if (function := engine.get("widgets", {}).get(widget, None)):
-                results = (await function(self, page)) or {}
-        except:
-            results = {"error": "An error occured, results are fallback from perplexity.ai."}
-        
-        await page.close() 
+        async with await self.browser.new_page() as page:
+            await page.goto(engine["engine"] + query) 
+
+            try:
+                if (function := engine.get("widgets", {}).get(widget, None)):
+                    results = (await function(self, page)) or {}
+            except Exception as e:
+                results = {"error": f"An error occurred: {str(e)}, results are fallback from perplexity.ai."}
         return results
+
     
     def parallel(self, *funcs, void=False):
         if not void:
@@ -290,4 +273,3 @@ class Browser:
         
     async def run_parallel(self, *funcs):
         return tuple(await asyncio.gather(*funcs))
-

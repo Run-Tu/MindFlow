@@ -65,8 +65,7 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, profile, verbose=False, messages: list = None, system=""):
-        self.settings = profile.settings
+    def __init__(self, verbose=False, messages: list = None, system=""):
         self.system = system
 
         self.verbose = verbose
