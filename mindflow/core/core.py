@@ -127,7 +127,7 @@ class MindFlow:
                 
                 elif "let's run the code" in chunk.get("content").lower():
                     for language, code in notebooks.items():
-                        output = self.computer.run(code, format=language, display=False)
+                        output = self.computer.run(code, language)
                         message, lmc = to_lmc(output, role="computer", format="output"), True
                         if self.dev:
                             yield message

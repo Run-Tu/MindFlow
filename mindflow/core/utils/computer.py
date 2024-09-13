@@ -1,108 +1,109 @@
 import io
 import os
-import sys
 import platform
-from rich.console import Console
+import contextlib
+import subprocess
 from rich.syntax import Syntax
 from ..utils.general import lazy_import
 import threading
-from functools import partial
 
 class Computer:
     def __init__(self, extensions) -> None:
         self.platform = platform.uname()
         self.user = os.getlogin()
         self.os = f"{self.platform.system} {self.platform.version}"
-        self.supported = ["python", "js"]
+        
         self.globals = {"lazy_import": lazy_import,
                         "extensions": extensions}
         
-        if self.platform.system == "Windows":
-            self.supported += ["cmd", "powershell"]
-        elif self.platform.system == "Darwin":
-            self.supported += ["applescript"]
-        elif self.platform.system == "Linux":
-            self.supported += ["bash"]
+        self.languages = {"cmd":[],
+                          "powershell":["powershell", "-Command"],
+                          "applescript":["osascript", "-e"],
+                          "bash":[],
+                          "js":["node", "-e"],
+                          "r": ["Rscript", "-e"],
+                          "java": ["java", "-e"]}
+        
+        self.supported = set(self.available())
+    
+    def available(self):
+        os_languages = {
+            "Windows": ["cmd", "powershell"],
+            "Darwin": ["applescript"],
+            "Linux": ["bash"]
+        }
+        
+        languages = {
+            "js": ["node", "-v"],
+            "r": ["R", "--version"],
+            "java": ["java", "-version"]
+        }
+        
+        supported = ["python"] + os_languages.get(self.platform.system, [])
+        for lang, command in languages.items():
+            if self.check(command):
+                supported.append(lang)
+        
+        return supported
+    
+    def check(self, command):
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            return result.returncode == 0
+        except Exception:
+            return False
             
-    def md(self, code, format='python', console=Console()):
-        console.print(Syntax(code, format, theme="github-dark", line_numbers=True))
-        print()
-        
+    def md(self, code, format='python', theme="github-dark"):
+        return Syntax(code, format, theme=theme, line_numbers=True)
 
-    def run(self, code, format='python', display=True):
-        if display:
-            print("\n")
-
-            console = Console()
-            if format == 'pseudocode':
-                console.print(f'[bold #4a4e54]{chr(0x1F785)} Task plan in `{format}`...[/bold #4a4e54]')
-                self.md(code, format, console)
-                return None
-
-            console.print(f'[bold #4a4e54]{chr(0x1F785)} Running `{format}`...[/bold #4a4e54]')
-            self.md(code, format, console)
-        
-        self.output = ""
-        
-        if format == 'python':
-            run = self.run_python
-        elif (format == 'bash') or (format == 'cmd') or (format == 'shell'):
-            run = self.run_shell
-        elif format == 'applescript' and platform.system() == 'Darwin':
-            run = self.run_applescript
-        elif format == 'js':
-            run = self.run_js
-        elif format == 'powershell':
-            run = self.run_powershell
-        else:
-            return f"MindFlow does not support the format: {format}"
-        
-        # new thread, so main thread won't close
-        thread = threading.Thread(target=partial(run, code))
-        thread.start()
-        thread.join()
-        
-        return (self.output 
-                if self.output 
-                else "The following code did not generate any console text output, but may generate other output.")
- 
-
+    def run(self, code, language='python'):
+        with ThreadContext(target=self.threaded_run, args=(code, language)) as context:
+            pass # bro wtf is happening here??
+        return context.result
+    
+    def threaded_run(self, code, language):
+        if language == 'python':
+            return self.run_python(code)
+        return self.run_shell(code, language)
+    
     def run_python(self, code):
         output = io.StringIO()
-        stdout = sys.stdout
-        sys.stdout = output
+        with contextlib.redirect_stdout(output):
+            try:
+                exec(code, self.globals.copy())
+            except Exception as e:
+                output.write(f"An error occurred: {e}")
+        return (result 
+                if (result := output.getvalue()) 
+                else "The following code did not generate any console text output, but may generate other output.")
+    
+    def run_shell(self, code, language):
         try:
-            exec(code, self.globals.copy())
+            command = self.languages.get(language, None)
+            if command is None:
+                return f"MindFlow does not support the language: {language}"
+            
+            result = subprocess.run(command + [f"{code}"], capture_output=True, text=True)
+            return (result.stdout 
+                    if result.stdout
+                    else f"Command executed with exit code: {result.returncode}")
+            
         except Exception as e:
-            output.write(f"An error occurred: {e}")
-        finally:
-            sys.stdout = stdout
-        self.output = output.getvalue()
+            return f"An error occurred: {e}"
 
-    def run_shell(self, code):
-        try:
-            result = os.system(code)
-            self.output = f"Command executed with exit code: {result}"
-        except Exception as e:
-            self.output = f"An error occurred: {e}"
 
-    def run_applescript(self, code):
-        try:
-            result = os.system(f'osascript -e "{code}"')
-            self.output = f"Command executed with exit code: {result}"
-        except Exception as e:
-            self.output = f"An error occurred: {e}"
+class ThreadContext:
+    def __init__(self, target, args=()):
+        self.result = None
+        self.thread = threading.Thread(target=self.wrapper, args=(target,) + args)
+        self.thread.daemon = True
 
-    def run_js(self, code):
-        try:
-            result = os.system(f'node -e "{code}"')
-            self.output = f"Command executed with exit code: {result}"
-        except Exception as e:
-            self.output = f"An error occurred: {e}"
-        
-    def run_powershell(self, code):
-        try:
-            result = os.system(f'powershell -Command "{code}"')
-            self.output = f"Command executed with exit code: {result}"
-        except Exception as e:
-            self.output = f"An error occurred: {e}"
+    def wrapper(self, target, *args):
+        self.result = target(*args)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.thread.join()

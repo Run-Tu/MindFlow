@@ -1,5 +1,4 @@
-from .core import MindFlow
-from rich.console import Console
+from rich import print
 from rich.markdown import Markdown
 from datetime import datetime
 
@@ -16,29 +15,32 @@ def to_chat(lmc: dict, content = True) -> str:
     return display
 
 async def main(macro):
-    console = Console()
     split = False
     while True:
         user = to_chat({"role": macro.computer.user}, content=False)
-        console.print(user)
-        query = input('~ ') or "plot an exponential graph"
+        print(user)
+        try:
+            query = input('~ ') or "plot an exponential graph"
+        except Exception as e:
+            print("Exiting `mindflow`...")
+            exit()
+            
         
         assistant = to_chat({"role": macro.name}, content=False)
-        console.print("\n" + assistant)
+        print("\n" + assistant)
         async for chunk in macro.chat(query, stream=True):
             if split:
                 assistant = to_chat({"role": macro.name}, content=False)
-                console.print("\n" + assistant)
+                print("\n" + assistant)
                 split = False
         
             if isinstance(chunk, dict):
                 split = True
                 print("\n")
                 computer, content = to_chat(chunk)
-                console.print(computer)
-                console.print(content)
-                print()
+                print(computer)
+                print(content)
             else:
-                console.print(chunk, end="")
+                print(chunk, end="")
 
         print("\n")
