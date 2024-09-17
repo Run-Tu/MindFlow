@@ -18,6 +18,7 @@ class Browser:
         
         # points to current mindflow instance
         self.mindflow = mindflow        
+        self.headless = True if (not mindflow.verbose) else False
         self.llm = LLM()
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
@@ -29,7 +30,6 @@ class Browser:
             module = importlib.import_module(path + engine, package=__package__)
             self.engines[engine]["widgets"] = {widget: getattr(module, lib) for widget, lib in data["widgets"].items()}
             
-        self.headless = True if (not headless) else (not mindflow.verbose)
         
         default_path = Path(__file__).parent / "config.default.toml"
         if (config_path := Path(__file__).parent / "config.toml").is_file():

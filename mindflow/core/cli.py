@@ -39,7 +39,7 @@ async def main(macro):
                 print("\n")
                 computer, content = to_chat(chunk)
                 print(computer)
-                print(content)
+                print(content, end="")
             else:
                 print(chunk, end="")
 
