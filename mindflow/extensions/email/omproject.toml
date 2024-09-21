@@ -1,0 +1,16 @@
+[settings]
+name = "email"
+version = "0.0.1"
+description = "Official default email extension for MindFlow. "
+why = "Use this extension to send emails to recipients."
+authors = ["Run Tu <run-tu@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[setup]
+init="__init__.py"
+instructions="docs/instructions.md"
+docs="docs/docs.md"
+source="https://github.com/MindFlow/browser.git"
+
+[dependencies]
