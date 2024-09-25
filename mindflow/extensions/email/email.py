@@ -30,10 +30,19 @@ class Oemail:
         
     def send(self, receiver_email, subject, body, attachments=[], cc=[], bcc=[]):
         msg = MIMEMultipart()
+        
+        try:
+            msg['To'] = validate(receiver_email)
+        except Exception as e:
+            return {"status": f'Error: {e}'}
+        
         msg['From'] = self.sender_email
-        msg['To'] = receiver_email
         msg['Subject'] = subject
-        msg['Cc'] = ', '.join(cc)
+        
+        try:
+            msg['Cc'] = ', '.join([validate(addr) for addr in cc])
+        except Exception as e:
+            return {"status": f'Error: {e}'}
 
         msg.attach(MIMEText(body, 'plain'))
 
