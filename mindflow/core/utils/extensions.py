@@ -31,15 +31,21 @@ class Extensions:
             loading = True
             while loading:
                 try:
-                    spec = importlib.util.spec_from_file_location(extension.name, extension / file)
+                    module_name = f"mindflow-{extension.name}"
+                    
+                    spec = importlib.util.spec_from_file_location(module_name, extension / file)
                     module = importlib.util.module_from_spec(spec)
-                    sys.modules[extension.name] = module
+                    
+                    sys.modules[module_name] = module
                     spec.loader.exec_module(module)
 
                     setattr(self, extension.name, getattr(module, extension.name.title())(mindflow=mindflow))
                     self.extensions.append(extension.name)
+                    
+                    # Load instructions
                     with open(extension / config["instructions"], "r") as f:
                         self.instructions[extension.name] = f.read()
+                    
                     loading = False
     
                 except ModuleNotFoundError as e:
