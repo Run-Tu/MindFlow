@@ -11,7 +11,7 @@ def validate(email):
         return email
     raise ValueError("Invalid email address")
 
-class Oemail:
+class Email:
     def __init__(self, mindflow):
         
         special = {"yahoo.com": "smtp.mail.yahoo.com",
