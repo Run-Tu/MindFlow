@@ -26,7 +26,7 @@ class Email:
         self.smtp_port = 587
         self.smtp_server = (special.get(server)
                             if special.get(server := self.email.split("@")[1])
-                            else server)
+                            else "smtp." + server)
         
     def send(self, receiver_email, subject, body, attachments=[], cc=[], bcc=[]):
         msg = MIMEMultipart()
