@@ -1,6 +1,6 @@
 from ..core.utils.computer import Computer
 from ..core.utils.llm import LLM, to_lmc, interpret_input
-from ..core.utils.general import load_settings
+from ..core.utils.general import load_settings, ROOT_DIR
 from ..core.utils.extensions import Extensions
 import chromadb
 from chromadb.config import Settings
@@ -11,14 +11,13 @@ import os
 import re
 
 class Profile:
-    """
-    store apikeys here. this is temp since its a bad setup omg.
-    """
-    def __init__(self, config_file= None, keys: dict ={}):
-        self.settings = load_settings(file=config_file)
+    def __init__(self, config_file= None):
+        self.settings = load_settings(file=config_file) if config_file else {}
+        if not self.settings.get("profile"):
+            self.settings["profile"] = {"name": "default", "version": "1.0.0"}
             
     def __str__(self):
-        return f'Profile({self.keys})'
+        return f'Profile({self.settings})'
 
 class MindFlow:
     """
@@ -63,7 +62,8 @@ class MindFlow:
         self.computer = Computer(self.extensions) if computer is None else computer
         
         # setup memory
-        location = Path(self.memories_dir, "ltm")
+        name, version = self.settings.get("profile").get("name"), self.settings.get("profile").get("version")
+        location = str(Path(ROOT_DIR, "profiles", name, version))
         self.ltm = chromadb.PersistentClient(str(location), Settings(anonymized_telemetry=False))    
         self.stm = chromadb.Client(Settings(anonymized_telemetry=False))
         self.collection = self.stm.create_collection("global")

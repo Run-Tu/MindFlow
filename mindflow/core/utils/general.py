@@ -98,7 +98,7 @@ def merge_dicts(dict1, dict2):
 
 def load_settings(file: str | Path = None, settings=None, section=None, verbose=False):
     if settings is None:
-        config_default = Path(ROOT_DIR, "config.default.toml")
+        config_default = Path(ROOT_DIR, "profile.template.toml")
         with open(config_default, "r") as f:
             settings = toml.load(f)
             

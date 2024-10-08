@@ -19,7 +19,9 @@ class Email:
                    "hotmail.com": "smtp-mail.outlook.com",
                    "icloud.com": "smtp.mail.me.com"}
         
-        config = mindflow.settings.get("oemail", {})
+        config = mindflow.settings.get("extensions", {}).get("email", None)
+        if config is None:
+            raise KeyError("Missing credentials for `email` extension!")
         
         self.email = validate(config.get("email"))
         self.password = config.get("password")

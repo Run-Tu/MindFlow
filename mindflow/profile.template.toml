@@ -1,0 +1,24 @@
+[assistant]
+name = "Basil"
+personality = "You have a kind, deterministic and professional attitude towards your work and respond in a formal, yet casual manner."
+messages = []
+verbose = false
+local = false
+telemetry = false
+breakers =  ["the task is done.", "the conversation is done."]
+
+[paths]
+prompts = "{root}/prompts"
+extensions = "{root}/extensions"
+ltm = "{root}/memories"
+    
+[extensions.browser]
+headless = true
+engine = "google"
+
+[safeguards]
+timeout = 16
+auto_run = true
+auto_install = true
+
+ephemeral = false
