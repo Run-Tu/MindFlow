@@ -23,7 +23,7 @@ def parse_args():
     
 
     parser = argparse.ArgumentParser(
-        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.1.15)[/dim]",
+        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.1.17)[/dim]",
         formatter_class=RichHelpFormatter
     )
     
@@ -39,11 +39,6 @@ def parse_args():
     kwargs = {}
     path = Path(ROOT_DIR, "profile.template.toml")
     
-    if args.verbose:
-        kwargs["verbose"] = args.verbose
-
-    if args.default:
-        return kwargs
     
     if args.api_key:
         with open(Path(ROOT_DIR, ".env"), "w") as f:
@@ -55,6 +50,10 @@ def parse_args():
         profiles = set(profiles.name 
                        for profiles in Path(ROOT_DIR, "profiles").iterdir())
         print(f"Profiles Available: {profiles}")
+        exit()
+        
+    if args.verbose:
+        kwargs["verbose"] = True
         
     if args.profile:
         # check if file exists
@@ -86,6 +85,9 @@ def parse_args():
             with open(Path(ROOT_DIR, ".env"), "w") as f:
                 f.write(f'API_KEY="{os.environ["API_KEY"]}"')
                 f.write(f'\nPROFILE="{name}:{version}"')
+                
+    if args.default:
+        return kwargs
         
     if (profile := args.switch) or (profile := os.environ.get("PROFILE")):
         
