@@ -8,9 +8,9 @@ telemetry = false
 breakers =  ["the task is done.", "the conversation is done."]
 
 [paths]
-prompts = "{root}/prompts"
-extensions = "{root}/extensions"
-ltm = "{root}/memories"
+prompts = "/core/prompts"
+extensions = "/extensions"
+ltm = "/profiles/{name}/{version}"
     
 [extensions.browser]
 headless = true

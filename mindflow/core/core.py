@@ -15,6 +15,7 @@ class Profile:
         self.settings = load_settings(file=config_file) if config_file else {}
         if not self.settings.get("profile"):
             self.settings["profile"] = {"name": "default", "version": "1.0.0"}
+        print(self.settings)
             
     def __str__(self):
         return f'Profile({self.settings})'
@@ -27,12 +28,11 @@ class MindFlow:
     def __init__(
             self,
             messages: list | None = None,
-            history_dir: Path | None = None,
-            skills_dir: Path | None = None,
             prompts_dir: Path | None = None,
             memories_dir: Path | None = None,
             extensions_dir: Path | None= None,
             verbose: bool = False,
+            telemetry: bool = False,
             local: bool = False,
             computer = None,
             profile = None,
@@ -50,22 +50,36 @@ class MindFlow:
         # settings
         self.profile = Profile() if profile is None else profile
         self.settings = self.profile.settings
+        self.safeguards = self.settings["safeguards"]
         self.dev = dev
-                
-        # setup paths
-        self.prompts_dir = Path(Path(__file__).parent, "prompts") if prompts_dir is None else prompts_dir
-        self.memories_dir = Path(Path(__file__).parent, "memories") if memories_dir is None else memories_dir
-        self.extensions_dir = Path(Path(__file__).parent.parent, "extensions") if extensions_dir is None else extensions_dir
         
         # setup other instances
         self.extensions = Extensions(self)
         self.computer = Computer(self.extensions) if computer is None else computer
         
+        # setup setup variables
+        profile = self.settings.get("profile", {})
+        self.info = {
+            "assistant": self.settings['assistant']['name'],
+            "personality": self.settings['assistant']['personality'],
+            "username": profile.get("name", self.computer.user),
+            "version": profile.get("version", "1.0.0"),
+            "os": self.computer.os,
+            "supported": self.computer.supported,
+            "extensions": self.extensions.load_instructions()
+        }
+        
+        #f"/profiles/{self.info["name"]}/{self.info["version"]}"))
+
+        # setup paths
+        paths = self.settings.get("paths", {})
+        self.prompts_dir = prompts_dir or ROOT_DIR / paths["prompts"]
+        self.memories_dir = memories_dir or ROOT_DIR / paths["memories"]
+        self.extensions_dir = extensions_dir or ROOT_DIR / paths["extensions"]
+        
         # setup memory
-        name, version = self.settings.get("profile").get("name"), self.settings.get("profile").get("version")
-        location = str(Path(ROOT_DIR, "profiles", name, version))
-        self.ltm = chromadb.PersistentClient(str(location), Settings(anonymized_telemetry=False))    
-        self.stm = chromadb.Client(Settings(anonymized_telemetry=False))
+        self.ltm = chromadb.PersistentClient(str(self.memories_dir), Settings(anonymized_telemetry=telemetry))    
+        self.stm = chromadb.Client(Settings(anonymized_telemetry=telemetry))
         self.collection = self.stm.create_collection("global")
         
         # experimental (not yet implemented)
@@ -73,15 +87,6 @@ class MindFlow:
 
         # setup prompts
         self.prompts = {}
-        self.info = {
-            "assistant": self.settings['assistant']['name'],
-            "personality": self.settings['assistant']['personality'],
-            "username": self.computer.user,
-            "os": self.computer.os,
-            "supported": self.computer.supported,
-            "extensions": self.extensions.load_instructions()
-        }
-
         prompts = os.listdir(self.prompts_dir)
         for filename in prompts:
             with open(Path(self.prompts_dir, filename), "r") as f:
@@ -94,15 +99,18 @@ class MindFlow:
             
         # setup llm
         self.name = self.info['assistant']
-        self.llm = LLM(messages=messages, verbose=verbose, system=self.prompts['initial']) if llm is None else llm
-        self.llm.messages = [] if messages is None else messages
+        self.llm = LLM(messages=messages, 
+                       verbose=verbose, 
+                       system=self.prompts['initial']) if llm is None else llm
         self.loop = asyncio.get_event_loop()
         
     async def streaming_chat(self, 
                              message: str = None, 
                              remember=True,
-                             timeout=16,
+                             timeout=None,
                              lmc=False):
+        
+        timeout = self.safeguards.get("timeout", 16) if timeout is None else timeout
     
         response, notebooks = "", {}
         for _ in range(timeout):

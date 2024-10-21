@@ -39,7 +39,7 @@ class SambaNova:
             async with session.post(self.endpoint, 
                                     headers={"Authorization": f"Bearer {self.api_key}"}, 
                                     json=data) as response:
-                message, meta = "", {}
+                message = ""
                 async for line in response.content:
                     if line:
                         decoded_line = line.decode('utf-8')[6:]
@@ -54,11 +54,7 @@ class SambaNova:
                         
                         if json_line.get("error"):
                             yield json_line.get("error", {}).get("message", "An unexpected error occured!")
-                            
-                        if not json_line.get("choices"):
-                            meta = json_line
-                            continue
-
+                    
                         options = json_line.get("choices")[0]
                         if options.get("finish_reason") == "end_of_text":
                             continue
@@ -70,9 +66,9 @@ class SambaNova:
                         yield chunk
                 
                 if self.remember or remember:
-                    self.messages.append(to_lmc(message) | meta)
+                    self.messages.append(to_lmc(message))
                     if (length := len(self.messages)) > self.limit:
-                        self.messages = self.messages[length-self.limit:]
+                        del self.messages[0]
 
     def chat(self, 
              message: str, 
