@@ -1,7 +1,7 @@
-from ..core.utils.computer import Computer
-from ..core.utils.llm import LLM, to_lmc, interpret_input
-from ..core.utils.general import load_settings, ROOT_DIR
-from ..core.utils.extensions import Extensions
+from ..computer import Computer
+from ..llm.llm import LLM, to_lmc, interpret_input
+from .utils.general import load_settings, ROOT_DIR
+from .utils.extensions import Extensions
 import chromadb
 from chromadb.config import Settings
 
@@ -9,16 +9,6 @@ from pathlib import Path
 import asyncio
 import os
 import re
-
-class Profile:
-    def __init__(self, config_file= None):
-        self.settings = load_settings(file=config_file) if config_file else {}
-        if not self.settings.get("profile"):
-            self.settings["profile"] = {"name": "default", "version": "1.0.0"}
-        print(self.settings)
-            
-    def __str__(self):
-        return f'Profile({self.settings})'
 
 class MindFlow:
     """
@@ -38,6 +28,7 @@ class MindFlow:
             profile = None,
             dev = True,
             llm = None,
+            extensions: dict = {},
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
         
@@ -54,8 +45,7 @@ class MindFlow:
         self.dev = dev
         
         # setup other instances
-        self.extensions = Extensions(self)
-        self.computer = Computer(self.extensions) if computer is None else computer
+        self.computer = Computer(extensions) if computer is None else computer
         
         # setup setup variables
         profile = self.settings.get("profile", {})
@@ -66,7 +56,7 @@ class MindFlow:
             "version": profile.get("version", "1.0.0"),
             "os": self.computer.os,
             "supported": self.computer.supported,
-            "extensions": self.extensions.load_instructions()
+            "extensions": "" #self.extensions.load_instructions()
         }
         
         #f"/profiles/{self.info["name"]}/{self.info["version"]}"))

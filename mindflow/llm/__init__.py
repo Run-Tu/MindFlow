@@ -1,5 +1,5 @@
 from datetime import datetime
-from ..llm.samba import SambaNova
+from .models.samba import SambaNova
 
 from dotenv import load_dotenv
 load_dotenv()

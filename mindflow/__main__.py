@@ -20,7 +20,6 @@ def parse_args():
     RichHelpFormatter.styles["argparse.groups"] = "bold"
     RichHelpFormatter.styles["argparse.args"] = "#79c0ff"
     RichHelpFormatter.styles["argparse.metavar"] = "#2a6284"
-    
 
     parser = argparse.ArgumentParser(
         description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.1.17)[/dim]",
@@ -39,7 +38,6 @@ def parse_args():
     kwargs = {}
     path = Path(ROOT_DIR, "profile.template.toml")
     
-    
     if args.api_key:
         with open(Path(ROOT_DIR, ".env"), "w") as f:
             f.write(f'API_KEY="{args.api_key}"')
@@ -50,7 +48,6 @@ def parse_args():
         profiles = set(profiles.name 
                        for profiles in Path(ROOT_DIR, "profiles").iterdir())
         print(f"Profiles Available: {profiles}")
-        exit()
         
     if args.verbose:
         kwargs["verbose"] = True
@@ -69,7 +66,7 @@ def parse_args():
         
         # check for duplicates
         name, version = profile.get("name"), profile.get("version", "1.0.0")
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.toml")
+        path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
         
         if args.save:
             override = False
