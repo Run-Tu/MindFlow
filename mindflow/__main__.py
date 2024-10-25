@@ -1,22 +1,24 @@
 import argparse
-from .core import cli
-import shutil
-from .core.core import MindFlow, Profile
-from .core.utils.general import ROOT_DIR
+from .core import MindFlow
+from .utils import ROOT_DIR, merge_dicts
 import asyncio
 import toml
+import sys
+import importlib
 import os
+
+from .cli import main as run_cli
 
 from pathlib import Path
 from rich.console import Console
-from rich.text import Text
-
 from rich_argparse import RichHelpFormatter
 
 # Create a console object
 console = Console()
 
 def parse_args():
+    from .profile.template import profile
+    
     RichHelpFormatter.styles["argparse.groups"] = "bold"
     RichHelpFormatter.styles["argparse.args"] = "#79c0ff"
     RichHelpFormatter.styles["argparse.metavar"] = "#2a6284"
@@ -35,8 +37,8 @@ def parse_args():
     parser.add_argument("--switch", metavar='<name>:<version>', type=str, help="Switch to a different profile's custom settings.")
 
     args = parser.parse_args()
-    kwargs = {}
-    path = Path(ROOT_DIR, "profile.template.toml")
+    Path(ROOT_DIR, "profiles").mkdir(exist_ok=True) 
+    path: Path | str = ""
     
     if args.api_key:
         with open(Path(ROOT_DIR, ".env"), "w") as f:
@@ -50,12 +52,12 @@ def parse_args():
         print(f"Profiles Available: {profiles}")
         
     if args.verbose:
-        kwargs["verbose"] = True
+        profile["config"]["verbose"] = True
         
     if args.profile:
         # check if file exists
-        path = args.profile
-        if not Path(path).is_file():
+        args_path = args.profile
+        if not Path(args_path).is_file():
             raise FileNotFoundError(f"Path to `{args.profile}` could not be found")
         
         # check for required fields
@@ -77,21 +79,24 @@ def parse_args():
                 if not override:
                     raise FileExistsError("profile with the same name and version already exists")
             
-            shutil.copyfile(path, str(path))   
+            # copy file
+            with open(args_path, "r") as f: contents = f.read()
+            path.touch()
+            with open(path, "w") as f: f.write(contents) 
             
             with open(Path(ROOT_DIR, ".env"), "w") as f:
                 f.write(f'API_KEY="{os.environ["API_KEY"]}"')
                 f.write(f'\nPROFILE="{name}:{version}"')
                 
     if args.default:
-        return kwargs
+        return profile
         
-    if (profile := args.switch) or (profile := os.environ.get("PROFILE")):
+    if (args_profile := args.switch) or (args_profile := os.environ.get("PROFILE")):
         
-        profile = profile.split(":")
-        if len(profile) >= 2: name, version = profile[0], profile[-1]
-        else: name, version = profile[0], None
-        
+        args_profile = args_profile.split(":")
+        if len(args_profile) >= 2: name, version = args_profile[0], args_profile[-1]
+        else: name, version = args_profile[0], None
+          
         profiles = set(profiles.name 
                        for profiles in Path(ROOT_DIR, "profiles").iterdir())
         
@@ -106,19 +111,29 @@ def parse_args():
         elif not version in versions:
             raise KeyError("Version does not exist.") 
         
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.toml")
+        path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
         with open(Path(ROOT_DIR, ".env"), "w") as f:
             f.write(f'API_KEY="{os.environ["API_KEY"]}"')
             f.write(f'\nPROFILE="{name}:{version}"')
         os.environ["PROFILE"] = f"{name}:{version}"
+    
+    if path:
+        module_name = f"mindflow.profile"
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        module = importlib.util.module_from_spec(spec)
         
-    kwargs["profile"] = Profile(path)
-    return kwargs
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        
+        profile = merge_dicts(profile, getattr(module, "profile", {}))
+        
+        
+    return profile
 
 def main():
-    args = parse_args()
-    macro = MindFlow(**args)
-    asyncio.run(cli.main(macro))
+    profile = parse_args()
+    macro = MindFlow(profile)
+    asyncio.run(run_cli(macro))
 
 if __name__ == "__main__":
     main()

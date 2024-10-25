@@ -1,6 +1,4 @@
-from ..core.core import MindFlow, Profile
-from ..extensions.browser.utils.general import get_relevant
-
+from ..core import MindFlow
 from rich import print
 import asyncio
 import os

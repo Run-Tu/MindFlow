@@ -17,14 +17,13 @@ def to_chat(lmc: dict, content = True) -> str:
 async def main(macro):
     split = False
     while True:
-        user = to_chat({"role": macro.computer.user}, content=False)
+        user = to_chat({"role": macro.profile["user"]["name"]}, content=False)
         print(user)
         try:
             query = input('~ ') or "plot an exponential graph"
         except Exception as e:
             print("Exiting `mindflow`...")
             exit()
-            
         
         assistant = to_chat({"role": macro.name}, content=False)
         print("\n" + assistant)

@@ -1,7 +1,9 @@
 from ..computer import Computer
-from ..llm.llm import LLM, to_lmc, interpret_input
-from .utils.general import load_settings, ROOT_DIR
-from .utils.extensions import Extensions
+from ..profile.template import profile as default_profile
+
+from ..llm import LLM, to_lmc, interpret_input
+from ..utils import ROOT_DIR, OS
+
 import chromadb
 from chromadb.config import Settings
 
@@ -17,6 +19,7 @@ class MindFlow:
     """
     def __init__(
             self,
+            profile = None,
             messages: list | None = None,
             prompts_dir: Path | None = None,
             memories_dir: Path | None = None,
@@ -25,47 +28,42 @@ class MindFlow:
             telemetry: bool = False,
             local: bool = False,
             computer = None,
-            profile = None,
             dev = True,
             llm = None,
             extensions: dict = {},
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
-        
+    
         # logging + debugging
-        self.verbose = verbose
+        self.verbose = verbose or profile["config"]["verbose"]
         
         # loop breakers
-        self.breakers = breakers
+        self.breakers = breakers or profile["assistant"]["breakers"]
         
         # settings
-        self.profile = Profile() if profile is None else profile
-        self.settings = self.profile.settings
-        self.safeguards = self.settings["safeguards"]
-        self.dev = dev
+        self.profile = profile or default_profile
+        self.safeguards = profile["safeguards"]
+        self.dev = dev or profile["config"]["dev"]
         
         # setup other instances
-        self.computer = Computer(extensions) if computer is None else computer
+        self.computer = computer or Computer(extensions or profile["extensions"])
         
         # setup setup variables
-        profile = self.settings.get("profile", {})
         self.info = {
-            "assistant": self.settings['assistant']['name'],
-            "personality": self.settings['assistant']['personality'],
-            "username": profile.get("name", self.computer.user),
-            "version": profile.get("version", "1.0.0"),
-            "os": self.computer.os,
+            "assistant": profile['assistant']['name'],
+            "personality": profile['assistant']['personality'],
+            "username": profile["user"]["name"],
+            "version": profile["user"]["version"],
+            "os": OS,
             "supported": self.computer.supported,
-            "extensions": "" #self.extensions.load_instructions()
+            "extensions": "" # extensions or profile["extensions"]
         }
         
-        #f"/profiles/{self.info["name"]}/{self.info["version"]}"))
-
         # setup paths
-        paths = self.settings.get("paths", {})
-        self.prompts_dir = prompts_dir or ROOT_DIR / paths["prompts"]
-        self.memories_dir = memories_dir or ROOT_DIR / paths["memories"]
-        self.extensions_dir = extensions_dir or ROOT_DIR / paths["extensions"]
+        paths = self.profile["paths"]
+        self.prompts_dir = prompts_dir or ROOT_DIR / Path(paths["prompts"])
+        self.memories_dir = memories_dir or ROOT_DIR / Path(paths["memories"])
+        self.extensions_dir = extensions_dir or ROOT_DIR / Path(paths["extensions"])
         
         # setup memory
         self.ltm = chromadb.PersistentClient(str(self.memories_dir), Settings(anonymized_telemetry=telemetry))    
@@ -73,7 +71,7 @@ class MindFlow:
         self.collection = self.stm.create_collection("global")
         
         # experimental (not yet implemented)
-        self.local = local
+        self.local = local or profile["config"]["local"]
 
         # setup prompts
         self.prompts = {}
@@ -88,7 +86,7 @@ class MindFlow:
         self.prompts['initial'] += "\n\n" + self.prompts['instructions']
             
         # setup llm
-        self.name = self.info['assistant']
+        self.name = profile['assistant']["name"]
         self.llm = LLM(messages=messages, 
                        verbose=verbose, 
                        system=self.prompts['initial']) if llm is None else llm
@@ -100,7 +98,7 @@ class MindFlow:
                              timeout=None,
                              lmc=False):
         
-        timeout = self.safeguards.get("timeout", 16) if timeout is None else timeout
+        timeout = timeout or self.safeguards["timeout"]
     
         response, notebooks = "", {}
         for _ in range(timeout):
@@ -146,7 +144,8 @@ class MindFlow:
              remember: bool = True,
              lmc: bool = False,
              timeout=16):
-        
+        timeout = timeout or self.safeguards["timeout"]
+    
         gen = self.streaming_chat(message, remember, timeout, lmc)
         if stream: return gen
         return self.loop.run_until_complete(self._gather(self, gen))

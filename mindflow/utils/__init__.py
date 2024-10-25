@@ -3,8 +3,16 @@ import importlib.util
 import toml
 import sys
 from pathlib import Path
+import os
+import platform
+from functools import partial as config
 
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+# constants
+ROOT_DIR = Path(__file__).resolve().parent.parent
+PLATFORM = platform.uname()
+USERNAME = os.getlogin()
+SYSTEM = platform.system
+OS = f"{platform.system} {platform.version}"
 
 def is_installed(package):
     spec = importlib.util.find_spec(package)

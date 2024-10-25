@@ -29,6 +29,6 @@ class Profile(TypedDict):
     user: User
     assistant: Assistant
     safeguards: Safeguards
-    path: Paths
+    paths: Paths
     extensions: Dict
     config: Config

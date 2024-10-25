@@ -2,8 +2,8 @@ import asyncio
 from playwright.async_api import async_playwright
 
 from pathlib import Path 
-from mindflow.llm.llm import LLM
-from mindflow.core.utils.profile import Profile
+from ...llm import LLM
+from ...profile import Profile
 
 from .utils.general import to_markdown, get_relevant, uid
 import importlib

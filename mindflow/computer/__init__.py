@@ -1,16 +1,11 @@
-import os
 import shutil
-import platform
 import subprocess
 from typing import List, Dict
 
 class Computer:
     def __init__(self, 
                  paths: Dict[str, list] = None,
-                 extensions: Dict[str] = None):
-        self.platform = platform.uname()
-        self.user = os.getlogin()
-        self.os = f"{self.platform.system} {self.platform.version}"
+                 extensions: Dict[str, object] = None):
         self.extensions = extensions or {}
         self.custom_paths = paths or {}
         self.supported = self.available()
