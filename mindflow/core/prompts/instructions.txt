@@ -26,17 +26,17 @@ Output of the code will be returned to you.
 **NOTE, EVERY TIME CODE IS RAN, THE SCRIPT/ NOTEBOOK IS CLEARED.**
 
 # THE EXTENSIONS RAG API
-There are many python RAG apps you can import to complete many tasks.
+There are many python RAG extensions you can import to complete many tasks.
 
 Import apps like so:
 ```python
-from mindflow.apps import Browser
+from mindflow.extensions import Browser
 browser = Browser()
 results = browser.search("latest msft stock prices")
 print(results)
 ```
 
-RAG apps you can access include:
+RAG extensions you can access include:
 ```python
 {extensions}
 ```

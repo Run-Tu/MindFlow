@@ -8,6 +8,12 @@ import re
 from ...utils import ROOT_DIR
 from pathlib import Path
 
+from typing import TypedDict
+
+class EmailKwargs(TypedDict):
+    email: str
+    password: str
+
 def validate(email):
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     if re.match(pattern, email):

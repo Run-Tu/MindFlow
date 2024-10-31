@@ -14,7 +14,7 @@ import toml
 
 from typing import TypedDict
 
-class BrowserConfig(TypedDict):
+class BrowserKwargs(TypedDict):
     headless: bool
     engine: str
 
@@ -272,7 +272,7 @@ class Browser:
 
             try:
                 if (function := engine.get("widgets", {}).get(widget, None)):
-                    results = (await function(self, page)) or {}
+                    results = {"results": (await function(self, page))} or {}
             except Exception as e:
                 results = {"error": f"An error occurred: {str(e)}, results are fallback from perplexity.ai."}
         return results

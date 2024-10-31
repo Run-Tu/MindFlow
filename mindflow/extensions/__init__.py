@@ -1,7 +1,7 @@
-from .browser import Browser
-from .email import Email
+from .browser import Browser, BrowserKwargs
+from .email import Email, EmailKwargs
 
-from ..utils import ROOT_DIR
+from ..utils import ROOT_DIR, Kwargs
 from pathlib import Path
 import importlib
 
@@ -10,6 +10,8 @@ def load_extensions():
         extensions = f.read().splitlines()
     
     for module_name in extensions:
-        globals()[module_name] = importlib.import_module(module_name)
+        globals()[module_name] = getattr(importlib.import_module(module_name), module_name.title())
+        if (kwargs := getattr(importlib.import_module(module_name), module_name.title()+"Kwargs")):
+            globals()[module_name+"Kwargs"] = kwargs
 
 load_extensions()

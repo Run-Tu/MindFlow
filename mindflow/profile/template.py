@@ -1,5 +1,4 @@
 from mindflow.profile import Profile
-from mindflow.extensions import Browser, Email
 from mindflow.utils import USERNAME
 
 profile: Profile = Profile(
@@ -23,10 +22,6 @@ profile: Profile = Profile(
         "prompts": "core/prompts",
         "extensions": "",
         "memories": f"profiles/{USERNAME}/1.0.0"
-    },
-    extensions = {
-        "Browser": Browser,
-        "Email": Email
     },
     config = {
         "telemetry": False,

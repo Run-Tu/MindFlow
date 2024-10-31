@@ -18,6 +18,8 @@ def is_installed(package):
     spec = importlib.util.find_spec(package)
     return spec is not None
 
+def Kwargs(**kwargs):
+    return kwargs
 
 def lazy_import(package,
                 name: str = '', 

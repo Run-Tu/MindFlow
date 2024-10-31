@@ -4,6 +4,7 @@ from typing import List, Dict
 from functools import partial
 from pathlib import Path
 from ..utils import ROOT_DIR
+import mindflow.extensions as extensions
 
 class Computer:
     def __init__(self, 
@@ -15,12 +16,18 @@ class Computer:
         self.extensions = extensions or {}
         self.custom_paths = paths or {}
         self.supported = self.available()
+        
+    def inject_kwargs(self, code):
+        for extension, vals in self.extensions.items():
+            if extension in code:
+                kwarg_str = ', '.join(f'{kwarg}={val!r}' for kwarg, val in vals.items())
+                code = code.replace(f"{extension}()", f"{extension}({kwarg_str})")
+        return code
     
     def load_instructions(self):
         return "\n\n".join(
-            extension.func.load_instructions() if isinstance(extension, partial) 
-            else extension.load_instructions() 
-            for extension in self.extensions.values()
+            getattr(extensions, extension).load_instructions()
+            for extension in self.extensions.keys()
         )
 
     def available(self) -> Dict[str, str]:
@@ -66,8 +73,7 @@ class Computer:
                 return f"MindFlow does not support the language: {language}"
             
             if language == "python":
-                # inject imports
-                code = f'from mindflow.apps import load\nload(r"{str(self.profile_path)}")' + '\n' + code
+                code = self.inject_kwargs(code)
 
             result = subprocess.run(command + [code], capture_output=True, text=True)
             if result.stdout or result.stderr:
