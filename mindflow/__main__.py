@@ -2,7 +2,6 @@ import argparse
 from .core import MindFlow
 from .utils import ROOT_DIR, merge_dicts
 import asyncio
-import toml
 import sys
 import importlib
 import os
@@ -10,11 +9,17 @@ import os
 from .cli import main as run_cli
 
 from pathlib import Path
-from rich.console import Console
 from rich_argparse import RichHelpFormatter
 
-# Create a console object
-console = Console()
+def load_profile(path: Path | str):
+    module_name = f"mindflow.parse_profile"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    
+    return getattr(module, "profile", {})
 
 def parse_args():
     from .profile.template import profile
@@ -24,7 +29,7 @@ def parse_args():
     RichHelpFormatter.styles["argparse.metavar"] = "#2a6284"
 
     parser = argparse.ArgumentParser(
-        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.1.17)[/dim]",
+        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.2.0)[/dim]",
         formatter_class=RichHelpFormatter
     )
     
@@ -61,35 +66,36 @@ def parse_args():
             raise FileNotFoundError(f"Path to `{args.profile}` could not be found")
         
         # check for required fields
-        with open(args.profile, "r") as f:
-            profile = toml.loads(f.read()).get("profile")
-        if not profile:
+        args_profile = load_profile(args.profile).get("user")
+            
+        if not args_profile:
             raise KeyError(f"`profile` field not found in `{args.profile}`")
         
         # check for duplicates
-        name, version = profile.get("name"), profile.get("version", "1.0.0")
+        name, version = args_profile.get("name"), args_profile.get("version", "1.0.0")
         path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
         
         if args.save:
             override = False
             if Path(path).is_file():
-                override = input("""It seems another profile with the same name and version already exists. 
-                                    Would you like to override this profile? (y/n)""").startswith("y")
+                override = input("""It seems another profile with the same name and version already exists. Would you like to override this profile? (y/n)""").startswith("y")
             
                 if not override:
                     raise FileExistsError("profile with the same name and version already exists")
             
             # copy file
             with open(args_path, "r") as f: contents = f.read()
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.touch()
             with open(path, "w") as f: f.write(contents) 
             
             with open(Path(ROOT_DIR, ".env"), "w") as f:
                 f.write(f'API_KEY="{os.environ["API_KEY"]}"')
                 f.write(f'\nPROFILE="{name}:{version}"')
+            os.environ["PROFILE"] = f"{name}:{version}"
                 
     if args.default:
-        return profile
+        return profile | {"path": Path(ROOT_DIR, "profile", "template.py")}
         
     if (args_profile := args.switch) or (args_profile := os.environ.get("PROFILE")):
         
@@ -112,23 +118,15 @@ def parse_args():
             raise KeyError("Version does not exist.") 
         
         path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
+        
         with open(Path(ROOT_DIR, ".env"), "w") as f:
             f.write(f'API_KEY="{os.environ["API_KEY"]}"')
             f.write(f'\nPROFILE="{name}:{version}"')
         os.environ["PROFILE"] = f"{name}:{version}"
     
     if path:
-        module_name = f"mindflow.profile"
-        spec = importlib.util.spec_from_file_location(module_name, path)
-        module = importlib.util.module_from_spec(spec)
-        
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        
-        profile = merge_dicts(profile, getattr(module, "profile", {}))
-        
-        
-    return profile
+        return merge_dicts(profile, load_profile(path)) | {"path": path}
+    return profile | {"path": Path(ROOT_DIR, "profile", "template.py")}
 
 def main():
     profile = parse_args()

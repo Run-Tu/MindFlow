@@ -11,8 +11,8 @@ from functools import partial as config
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PLATFORM = platform.uname()
 USERNAME = os.getlogin()
-SYSTEM = platform.system
-OS = f"{platform.system} {platform.version}"
+SYSTEM = platform.system()
+OS = f"{SYSTEM} {platform.version()}"
 
 def is_installed(package):
     spec = importlib.util.find_spec(package)

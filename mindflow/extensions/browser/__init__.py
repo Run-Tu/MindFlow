@@ -3,7 +3,7 @@ from playwright.async_api import async_playwright
 
 from pathlib import Path 
 from ...llm import LLM
-from ...profile import Profile
+from ...utils import ROOT_DIR
 
 from .utils.general import to_markdown, get_relevant, uid
 import importlib
@@ -19,7 +19,7 @@ class BrowserConfig(TypedDict):
     engine: str
 
 class Browser:
-    def __init__(self, profile: Profile, headless=True, engine="google"):
+    def __init__(self, headless=True, engine="google"):
         # Temp solution, loads widgets from ALL engines
         # Should only load widgets from chosen engine
         
@@ -50,6 +50,11 @@ class Browser:
         # Init browser at runtime for faster speeds in the future
         self.loop = asyncio.get_event_loop()
         self.loop.run_until_complete(self.init_playwright())
+    
+    @staticmethod
+    def load_instructions():
+        with open(Path(ROOT_DIR, "extensions", "browser", "docs", "instructions.md"), "r") as f:
+            return f.read()
 
     async def close_playwright(self):
         await self.browser.close()

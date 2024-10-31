@@ -1,6 +1,6 @@
-from . import Profile
-from ..extensions import Browser, Email
-from ..utils import USERNAME
+from mindflow.profile import Profile
+from mindflow.extensions import Browser, Email
+from mindflow.utils import USERNAME
 
 profile: Profile = Profile(
     user = { 

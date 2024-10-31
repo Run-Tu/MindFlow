@@ -5,11 +5,8 @@ from email import encoders
 from smtplib import SMTP
 import re
 
-from typing import TypedDict
-
-class EmailConfig(TypedDict):
-    email: str
-    password: str
+from ...utils import ROOT_DIR
+from pathlib import Path
 
 def validate(email):
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -18,23 +15,27 @@ def validate(email):
     raise ValueError("Invalid email address")
 
 class Email:
-    def __init__(self, mindflow):
+    def __init__(self, email: str = None, password: str = None):
         
         special = {"yahoo.com": "smtp.mail.yahoo.com",
                    "outlook.com": "smtp-mail.outlook.com",
                    "hotmail.com": "smtp-mail.outlook.com",
                    "icloud.com": "smtp.mail.me.com"}
         
-        config = mindflow.settings.get("extensions", {}).get("email", None)
-        if config is None:
-            raise KeyError("Missing credentials for `email` extension!")
+        if email is None or password is None:
+            raise KeyError(f"Missing credentials for `email` extension!\n{email} {password}")
         
-        self.email = validate(config.get("email"))
-        self.password = config.get("password")
+        self.email = validate(email)
+        self.password = password
         self.smtp_port = 587
         self.smtp_server = (special.get(server)
                             if special.get(server := self.email.split("@")[1])
                             else "smtp." + server)
+        
+    @staticmethod
+    def load_instructions():
+        with open(Path(ROOT_DIR, "extensions", "email", "docs", "instructions.md"), "r") as f:
+            return f.read()
         
     def send(self, receiver_email, subject, body, attachments=[], cc=[], bcc=[]):
         msg = MIMEMultipart()
@@ -44,7 +45,7 @@ class Email:
         except Exception as e:
             return {"status": f'Error: {e}'}
         
-        msg['From'] = self.sender_email
+        msg['From'] = self.email
         msg['Subject'] = subject
         
         try:
@@ -66,9 +67,9 @@ class Email:
         try:
             with SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
-                server.login(self.sender_email, self.password)
+                server.login(self.email, self.password)
                 text = msg.as_string()
-                server.sendmail(self.sender_email, to_addrs, text)
+                server.sendmail(self.email, to_addrs, text)
                 return {"status": f"Email successfully sent to `{receiver_email}`!"}
         except Exception as e:
             return {"status": f'Error: {e}'}

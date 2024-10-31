@@ -1,4 +1,5 @@
 from ..computer import Computer
+from ..profile import Profile
 from ..profile.template import profile as default_profile
 
 from ..llm import LLM, to_lmc, interpret_input
@@ -19,7 +20,7 @@ class MindFlow:
     """
     def __init__(
             self,
-            profile = None,
+            profile: Profile = None,
             messages: list | None = None,
             prompts_dir: Path | None = None,
             memories_dir: Path | None = None,
@@ -33,6 +34,10 @@ class MindFlow:
             extensions: dict = {},
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
+        # setup other instances
+        self.computer = computer or Computer(profile_path=profile.get("path", None),
+                                             paths=profile.get("languages", {}),
+                                             extensions=extensions or profile["extensions"])
     
         # logging + debugging
         self.verbose = verbose or profile["config"]["verbose"]
@@ -45,9 +50,6 @@ class MindFlow:
         self.safeguards = profile["safeguards"]
         self.dev = dev or profile["config"]["dev"]
         
-        # setup other instances
-        self.computer = computer or Computer(extensions or profile["extensions"])
-        
         # setup setup variables
         self.info = {
             "assistant": profile['assistant']['name'],
@@ -55,8 +57,8 @@ class MindFlow:
             "username": profile["user"]["name"],
             "version": profile["user"]["version"],
             "os": OS,
-            "supported": self.computer.supported,
-            "extensions": "" # extensions or profile["extensions"]
+            "supported": list(self.computer.supported),
+            "extensions": extensions or self.computer.load_instructions()
         }
         
         # setup paths
