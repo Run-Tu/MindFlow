@@ -26,6 +26,7 @@ class MindFlow:
             memories_dir: Path | None = None,
             extensions_dir: Path | None= None,
             verbose: bool = False,
+            conversational: bool = False,
             telemetry: bool = False,
             local: bool = False,
             computer = None,
@@ -41,6 +42,7 @@ class MindFlow:
     
         # logging + debugging
         self.verbose = verbose or profile["config"]["verbose"]
+        self.conversational = conversational or profile["config"]["conversational"]
         
         # loop breakers
         self.breakers = breakers or profile["assistant"]["breakers"]
@@ -86,6 +88,8 @@ class MindFlow:
                                                               for replace in re.findall(r'\{(.*?)\}', self.prompts[name])})
 
         self.prompts['initial'] += "\n\n" + self.prompts['instructions']
+        if self.conversational:
+            self.prompts['initial'] += "\n\n" + self.prompts['conversational']
             
         # setup llm
         self.name = profile['assistant']["name"]
@@ -102,14 +106,24 @@ class MindFlow:
         
         timeout = timeout or self.safeguards["timeout"]
     
-        response, notebooks = "", {}
+        response, notebooks, hidden = "", {}, False
         for _ in range(timeout):
             async for chunk in self.llm.chat(message=message, 
                                              stream=True,
                                              remember=remember, 
                                              lmc=lmc):
                 response += chunk
-                yield chunk
+                if not self.verbose and self.conversational:
+                    if "<hidden>" in chunk:
+                        hidden = True
+                        continue
+                    elif "</hidden>" in chunk:
+                        hidden = False
+                        continue
+                
+                if not hidden:
+                    yield chunk
+                
                 
             # because of this, it's only partially async
             # will fix in future versions

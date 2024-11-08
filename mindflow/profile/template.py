@@ -8,7 +8,7 @@ profile: Profile = Profile(
     },
     assistant = {
         "name": "Basil",
-        "personality": "You have a kind, deterministic and professional attitude towards your work and respond in a formal, yet casual manner.",
+        "personality": "You have a kind, deterministic and professional attitude towards your work and respond in a concise, short, formal, yet casual manner.",
         "messages": [],
         "breakers": ["the task is done.", 
                      "the conversation is done."]
@@ -20,14 +20,14 @@ profile: Profile = Profile(
     },
     paths = { 
         "prompts": "core/prompts",
-        "extensions": "",
         "memories": f"profiles/{USERNAME}/1.0.0"
     },
     config = {
         "telemetry": False,
         "ephemeral": False,
-        "verbose": False,
+        "verbose": True,
         "local": False,
-        "dev": False
+        "dev": False,
+        "conversational": True,
     }
 )
