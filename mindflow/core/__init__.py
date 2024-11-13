@@ -13,6 +13,7 @@ import asyncio
 import os
 import re
 
+
 class MindFlow:
     """
     The core of all operations occurs here.
@@ -24,31 +25,36 @@ class MindFlow:
             messages: list | None = None,
             prompts_dir: Path | None = None,
             memories_dir: Path | None = None,
-            extensions_dir: Path | None= None,
+            tts: bool = False,
+            stt: bool = False,
             verbose: bool = False,
             conversational: bool = False,
             telemetry: bool = False,
             local: bool = False,
             computer = None,
-            dev = True,
+            dev = False,
             llm = None,
             extensions: dict = {},
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
+        profile = profile or default_profile
+        self.profile = profile
+        
         # setup other instances
         self.computer = computer or Computer(profile_path=profile.get("path", None),
                                              paths=profile.get("languages", {}),
-                                             extensions=extensions or profile["extensions"])
+                                             extensions=extensions or profile.get("extensions", {}))
     
         # logging + debugging
         self.verbose = verbose or profile["config"]["verbose"]
         self.conversational = conversational or profile["config"]["conversational"]
+        self.tts = tts or profile["config"].get("tts", {})
+        self.stt = tts or profile["config"].get("stt", {})
         
         # loop breakers
         self.breakers = breakers or profile["assistant"]["breakers"]
         
         # settings
-        self.profile = profile or default_profile
         self.safeguards = profile["safeguards"]
         self.dev = dev or profile["config"]["dev"]
         
@@ -67,7 +73,6 @@ class MindFlow:
         paths = self.profile["paths"]
         self.prompts_dir = prompts_dir or ROOT_DIR / Path(paths["prompts"])
         self.memories_dir = memories_dir or ROOT_DIR / Path(paths["memories"])
-        self.extensions_dir = extensions_dir or ROOT_DIR / Path(paths["extensions"])
         
         # setup memory
         self.ltm = chromadb.PersistentClient(str(self.memories_dir), Settings(anonymized_telemetry=telemetry))    
@@ -113,8 +118,10 @@ class MindFlow:
                                              remember=remember, 
                                              lmc=lmc):
                 response += chunk
-                if not self.verbose and self.conversational:
-                    if "<hidden>" in chunk:
+                if self.conversational:
+                    if self.verbose or self.dev:
+                        pass
+                    elif "<hidden>" in chunk:
                         hidden = True
                         continue
                     elif "</hidden>" in chunk:
@@ -123,6 +130,9 @@ class MindFlow:
                 
                 if not hidden:
                     yield chunk
+                
+            if self.conversational:
+                yield "<end>"
                 
                 
             # because of this, it's only partially async
@@ -141,7 +151,7 @@ class MindFlow:
                     for language, code in notebooks.items():
                         output = self.computer.run(code, language)
                         message, lmc = to_lmc(output, role="computer", format="output"), True
-                        if self.dev:
+                        if self.dev or self.verbose: 
                             yield message
                     notebooks = {}
                     
@@ -152,7 +162,7 @@ class MindFlow:
         raise Warning("MindFlow has exceeded it's timeout stream of thoughts!")
     
     async def _gather(self, gen):
-        return await "".join([chunk async for chunk in gen])
+        return "".join([str(chunk) async for chunk in gen])
 
     def chat(self, 
              message: str | None = None, 
@@ -164,4 +174,4 @@ class MindFlow:
     
         gen = self.streaming_chat(message, remember, timeout, lmc)
         if stream: return gen
-        return self.loop.run_until_complete(self._gather(self, gen))
+        return self.loop.run_until_complete(self._gather(gen))

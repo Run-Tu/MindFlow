@@ -18,6 +18,16 @@ def is_installed(package):
     spec = importlib.util.find_spec(package)
     return spec is not None
 
+def load_profile(path: Path | str):
+    module_name = f"mindflow.parse_profile"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    
+    return getattr(module, "profile", {})
+
 def Kwargs(**kwargs):
     return kwargs
 

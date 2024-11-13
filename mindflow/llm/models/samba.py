@@ -34,7 +34,7 @@ class SambaNova:
         self.endpoint = endpoint
         self.loop = asyncio.get_event_loop()
             
-    async def _stream_chat(self, data, remember=False):
+    async def async_stream_chat(self, data, remember=False):
         async with aiohttp.ClientSession() as session:
             async with session.post(self.endpoint, 
                                     headers={"Authorization": f"Bearer {self.api_key}"}, 
@@ -77,6 +77,7 @@ class SambaNova:
              max_tokens=1400,
              remember=False, 
              lmc=False,
+             asynchronous=True,
              system: str = None):
         
         system = to_lmc(system, role="system") if system else self.system
@@ -95,13 +96,13 @@ class SambaNova:
             self.messages.append(message)
             
         if stream: 
-            return self._stream_chat(template, remember)
-        return self.loop.run_until_complete(self._static_chat(template, remember))
+            return self.async_stream_chat(template, remember)
+        return self.loop.run_until_complete(self.static_chat(template, remember))
         
-    async def _static_chat(self, template, remember):
+    async def static_chat(self, template, remember):
         return "".join([chunk 
                         async for chunk in 
-                        self._stream_chat(template, remember)])
+                        self.async_stream_chat(template, remember)])
 
 async def main():
     llm = SambaNova("APIKEY",

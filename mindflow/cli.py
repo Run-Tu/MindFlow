@@ -1,6 +1,10 @@
 from rich import print
 from rich.markdown import Markdown
 from datetime import datetime
+from .speech import Speech
+
+import threading
+
 
 def to_chat(lmc: dict, content = True) -> str:
     _type, _role, _content, _format = (lmc.get("type", "message"), 
@@ -16,6 +20,8 @@ def to_chat(lmc: dict, content = True) -> str:
 
 async def main(macro):
     split = False
+    hidden = False
+    speech = Speech()
     while True:
         user = to_chat({"role": macro.profile["user"]["name"]}, content=False)
         print(user)
@@ -40,6 +46,15 @@ async def main(macro):
                 print(computer)
                 print(content, end="")
             else:
-                print(chunk, end="")
+                if "<hidden>" in chunk:
+                    hidden = True
+                elif "</hidden>" in chunk:
+                    hidden = False
+                
+                if not hidden:
+                    speech.tts.stream(chunk)
+                if not (chunk == "<end>"):
+                    print(chunk, end="")
+                
 
         print("\n")
