@@ -33,12 +33,14 @@ def Kwargs(**kwargs):
 
 def lazy_import(package,
                 name: str = '', 
+                install_name: str = '',
                 prefixes: tuple = ("pip install ", "py -m pip install "),
                 install= False,
                 void = False,
                 verbose = True,
                 optional=True):
     
+    name = name or package
     if package in sys.modules:
         return sys.modules[package]
 
@@ -53,20 +55,20 @@ def lazy_import(package,
             success = False
             for prefix in prefixes:
                 try: 
-                    subprocess.run(prefix + package, shell=True, check=True)
+                    subprocess.run(prefix + install_name or package, shell=True, check=True)
                     success = True
                     break
                 except subprocess.CalledProcessError: 
                     continue
             if not success:
-                raise ImportError(f"Failed to install module '{name or package}'")
-            spec = importlib.util.find_spec(name or package)
+                raise ImportError(f"Failed to install module '{name}'")
+            spec = importlib.util.find_spec(name)
             if spec is None:
-                raise ImportError(f"Failed to install module '{name or package}'")
+                raise ImportError(f"Failed to install module '{name}'")
         else:
-            raise ImportError(f"Module '{name or package}' cannot be found")
+            raise ImportError(f"Module '{name}' cannot be found")
     elif verbose:
-        print(f"Module '{package}' is already installed.")
+        print(f"Module '{name}' is already installed.")
         
     if void:
         return None

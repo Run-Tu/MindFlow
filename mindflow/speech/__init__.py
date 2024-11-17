@@ -1,24 +1,4 @@
-import RealtimeTTS
-
-import logging
-logging.disable(logging.CRITICAL + 1)
-
-class TTS(RealtimeTTS.TextToAudioStream):
-    def __init__(self,
-                 tts: dict = None,
-                 *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.config = tts or {}
-        self.chunks = ""
-        
-    def stream(self, chunk):
-        if chunk == "<end>":
-            self.feed(self.chunks)
-            self.chunks = ""
-            self.play_async()
-        else:
-            self.chunks += chunk
-
+from ..utils import lazy_import
 
 class Speech:
     def __init__(self, 
@@ -27,4 +7,6 @@ class Speech:
         self.stt_config = stt or {}
             
         config = tts or {}
-        self.tts = TTS(config, getattr(RealtimeTTS, config.get("engine", "SystemEngine"))())
+        if config.get("enabled"):
+            from .tts import TTS
+            self.tts = TTS(config, config.get("engine", "SystemEngine"))

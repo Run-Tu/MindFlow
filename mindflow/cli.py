@@ -21,7 +21,10 @@ def to_chat(lmc: dict, content = True) -> str:
 async def main(macro):
     split = False
     hidden = False
-    speech = Speech()
+    
+    if macro.profile["tts"]["enabled"]:
+        speech = Speech(tts=macro.profile["tts"])
+        
     while True:
         user = to_chat({"role": macro.profile["user"]["name"]}, content=False)
         print(user)
@@ -46,13 +49,14 @@ async def main(macro):
                 print(computer)
                 print(content, end="")
             else:
-                if "<hidden>" in chunk:
-                    hidden = True
-                elif "</hidden>" in chunk:
-                    hidden = False
-                
-                if not hidden:
-                    speech.tts.stream(chunk)
+                if macro.profile["tts"]["enabled"]:
+                    if "<hidden>" in chunk:
+                        hidden = True
+                    elif "</hidden>" in chunk:
+                        hidden = False
+                    
+                    if not hidden:
+                        speech.tts.stream(chunk)
                 if not (chunk == "<end>"):
                     print(chunk, end="")
                 

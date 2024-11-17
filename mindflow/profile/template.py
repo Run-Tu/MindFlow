@@ -35,7 +35,7 @@ profile: Profile = Profile(
         "Browser": BrowserKwargs(engine="google")
     },
     tts = {
-        "enabled": True,
+        "enabled": False,
         "engine": "SystemEngine"
     }
 )
