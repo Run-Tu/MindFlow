@@ -53,8 +53,9 @@ async def main(macro):
                     if "<hidden>" in chunk:
                         hidden = True
                     elif "</hidden>" in chunk:
+                        chunk = chunk.replace("</hidden>", "")
                         hidden = False
-                    
+                        
                     if not hidden:
                         speech.tts.stream(chunk)
                 if not (chunk == "<end>"):
