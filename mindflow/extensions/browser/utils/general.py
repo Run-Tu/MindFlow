@@ -54,25 +54,3 @@ def to_markdown(html, ignore=[], ignore_ids=[], ignore_classes=[], strip=[]):
     markdown = filter_markdown(md(str(soup), strip=strip))
     return markdown
 
-def get_relevant(document: dict, threshold: int = 1.125, clean=False):
-    # temp, filter by distance
-    # future, density based retrieval relavance 
-    # https://github.com/chroma-core/chroma/blob/main/chromadb/experimental/density_relevance.ipynb
-
-    mask = np.array(document['distances']) <= threshold
-    keys = tuple(set(document) & set(('distances', 'documents', 'metadatas', 'ids')))
-    for key in keys:
-        document[key] = np.array(document[key])[mask].tolist()
-        
-    if document.get('ids'):
-        _, unique_indices = np.unique(document['ids'], return_index=True)
-        for key in ('distances', 'documents', 'metadatas', 'ids'):
-            document[key] = np.array(document[key])[unique_indices].tolist()
-            
-    if clean:
-        document = "\n\n".join(np.array(document["documents"]).flatten().tolist())
-    return document
-
-def uid(length=6):
-    characters = string.ascii_letters + string.digits + '-'
-    return ''.join(random.choice(characters) for _ in range(length))

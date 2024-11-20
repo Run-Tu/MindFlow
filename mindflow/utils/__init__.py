@@ -5,7 +5,11 @@ import sys
 from pathlib import Path
 import os
 import platform
+
+import random
+import string
 from functools import partial as config
+import numpy as np
 
 # constants
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +41,7 @@ def lazy_import(package,
                 prefixes: tuple = ("pip install ", "py -m pip install "),
                 install= False,
                 void = False,
-                verbose = True,
+                verbose = False,
                 optional=True):
     
     name = name or package
@@ -134,3 +138,26 @@ def load_settings(file: str | Path = None, settings=None, section=None, verbose=
                 print("config.toml not found, using config.defaults.toml instead!")
 
     return settings.get(section, settings) if section else settings
+
+def generate_id(length=8):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+ 
+def get_relevant(document: dict, threshold: float = 1.125, clean=False):
+    # temp, filter by distance
+    # future, density based retrieval relevance 
+    # https://github.com/chroma-core/chroma/blob/main/chromadb/experimental/density_relevance.ipynb
+
+    mask = np.array(document['distances']) <= threshold
+    keys = tuple(set(document) & set(('distances', 'documents', 'metadatas', 'ids')))
+    for key in keys:
+        document[key] = np.array(document[key])[mask].tolist()
+        
+    if document.get('ids'):
+        _, unique_indices = np.unique(document['ids'], return_index=True)
+        for key in ('distances', 'documents', 'metadatas', 'ids'):
+            document[key] = np.array(document[key])[unique_indices].tolist()
+            
+    if clean:
+        document = "\n\n".join(np.array(document["documents"]).flatten().tolist())
+    return document

@@ -37,29 +37,29 @@ async def main(macro):
         assistant = to_chat({"role": macro.name}, content=False)
         print("\n" + assistant)
         async for chunk in macro.chat(query, stream=True):
-            if split:
-                assistant = to_chat({"role": macro.name}, content=False)
-                print("\n" + assistant)
-                split = False
-        
-            if isinstance(chunk, dict):
-                split = True
+            if isinstance(chunk, dict):        
                 print("\n")
                 computer, content = to_chat(chunk)
                 print(computer)
-                print(content, end="")
-            else:
-                if macro.profile["tts"]["enabled"]:
-                    if "<hidden>" in chunk:
-                        hidden = True
-                    elif "</hidden>" in chunk:
-                        chunk = chunk.replace("</hidden>", "")
-                        hidden = False
-                        
-                    if not hidden:
-                        speech.tts.stream(chunk)
-                if not (chunk == "<end>"):
-                    print(chunk, end="")
+                print(content)
                 
+                if chunk.get("role", "").lower() == "computer":
+                    assistant = to_chat({"role": macro.name}, content=False)
+                    print("\n" + assistant)
+        
+
+            elif macro.profile["tts"]["enabled"]:
+                if "<hidden>" in chunk:
+                    hidden = True
+                elif "</hidden>" in chunk:
+                    chunk = chunk.replace("</hidden>", "")
+                    hidden = False
+                    
+                if not hidden:
+                    speech.tts.stream(chunk)
+                    
+            if isinstance(chunk, str) and not (chunk == "<end>"):
+                print(chunk, end="")
+            
 
         print("\n")

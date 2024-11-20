@@ -2,14 +2,18 @@ from ..computer import Computer
 from ..profile import Profile
 from ..profile.template import profile as default_profile
 
-from ..llm import LLM, to_lmc, interpret_input
-from ..utils import ROOT_DIR, OS
+from ..llm import LLM, to_lmc, to_chat, interpret_input
+from ..utils import ROOT_DIR, OS, generate_id, get_relevant
 
-import chromadb
+from ..memory.server import Manager
+from ..memory.client import Memory
 from chromadb.config import Settings
 
+from datetime import datetime
 from pathlib import Path
+import threading
 import asyncio
+import json
 import os
 import re
 
@@ -75,23 +79,34 @@ class MindFlow:
         self.memories_dir = memories_dir or ROOT_DIR / Path(paths["memories"])
         
         # setup memory
-        self.ltm = chromadb.PersistentClient(str(self.memories_dir), Settings(anonymized_telemetry=telemetry))    
-        self.stm = chromadb.Client(Settings(anonymized_telemetry=telemetry))
-        self.collection = self.stm.create_collection("global")
+        self.memory_manager = Manager(path=self.memories_dir, telemetry=telemetry)
+        self.memory_thread = self.memory_manager.serve()
+        
+        self.memory = Memory(settings=Settings(anonymized_telemetry=telemetry))
+        self.ltm = self.memory.get_collection("ltm")
+        self.cache = self.memory.get_collection("cache")
         
         # experimental (not yet implemented)
         self.local = local or profile["config"]["local"]
 
         # setup prompts
         self.prompts = {}
+        
         prompts = os.listdir(self.prompts_dir)
         for filename in prompts:
+            name = filename.split('.')[0]    
             with open(Path(self.prompts_dir, filename), "r") as f:
-                name = filename.split('.')[0]
                 self.prompts[name] = f.read().strip()
-            self.prompts[name] = self.prompts[name].format(**{replace:self.info.get(replace) 
-                                                              for replace in re.findall(r'\{(.*?)\}', self.prompts[name])})
-
+            
+            if name == "memorise":
+                continue
+            
+            replacements = {
+                replace: self.info.get(replace)
+                for replace in re.findall(r'\{(.*?)\}', self.prompts[name])
+            }
+            self.prompts[name] = self.prompts[name].format(**replacements)
+            
         self.prompts['initial'] += "\n\n" + self.prompts['instructions']
         if self.conversational:
             self.prompts['initial'] += "\n\n" + self.prompts['conversational']
@@ -103,6 +118,55 @@ class MindFlow:
                        system=self.prompts['initial']) if llm is None else llm
         self.loop = asyncio.get_event_loop()
         
+    async def remember(self, message):
+        document = self.ltm.query(query_texts=[message],
+                                  n_results=3,
+                                  include=["documents", "metadatas", "distances"])
+        
+        # filter by distance
+        snapshot = get_relevant(document, threshold=1.45)
+        #print(snapshot)
+        if not snapshot.get("documents"):
+            return []
+        
+        memories = []
+        for document, metadata in zip(snapshot.get("documents", []),
+                                      snapshot.get("metadatas", [])):
+            text = f"{document}\n[metadata: {metadata}]"
+            memories.append(to_lmc(text, role="Memory", type="memory snapshot"))
+        
+        #print(memories)
+        return memories
+    
+    def add_memory(self, memory):
+        try: memory = json.loads(memory)
+        except: return
+        
+        if not memory.get("memory"): return
+            
+        kwargs = {}
+        if memory.get("memory"):
+            kwargs["documents"] = memory["memory"]
+        if memory.get("metadata"):
+            kwargs["metadatas"] = memory["metadata"] | {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        if kwargs:
+            kwargs["ids"] = [generate_id()]
+        self.ltm.add(**kwargs)
+
+        
+    def memorise(self, messages):
+        memory = self.llm.chat("\n\n".join(map(to_chat, messages)), 
+                               system=self.prompts["memorise"],
+                               remember=False,
+                               stream=False)
+        if not memory: return
+        self.add_memory(memory)
+        
+    def thread_memorise(self, messages: list[str]):
+        thread = threading.Thread(target=self.memorise, args=[messages])
+        thread.start()
+        thread.join()
+        
     async def streaming_chat(self, 
                              message: str = None, 
                              remember=True,
@@ -113,6 +177,17 @@ class MindFlow:
     
         response, notebooks, hidden = "", {}, False
         for _ in range(timeout):
+            # TODO: clean up. this is really messy.
+            
+            # remember anything relevant
+            
+            if not lmc and (memory := await self.remember(message)):
+                #print(memory)
+                # if self.dev or self.verbose:
+                #     for chunk in memory:
+                #         yield chunk
+                self.llm.messages += memory
+            
             async for chunk in self.llm.chat(message=message, 
                                              stream=True,
                                              remember=remember, 
@@ -134,6 +209,9 @@ class MindFlow:
             if self.conversational:
                 yield "<end>"
                 
+            # memorise if relevant
+            memorise = [] if lmc else [to_lmc(message, role="User")]
+            self.thread_memorise(self.llm.messages[:-3] + memorise + [to_lmc(response)])
                 
             # because of this, it's only partially async
             # will fix in future versions
@@ -142,10 +220,8 @@ class MindFlow:
             for chunk in interpret_input(response): 
                 if chunk.get("type", None) == "code":
                     language, code = chunk.get("format"), chunk.get("content")
-                    if language in notebooks:
-                        notebooks[language] += "\n\n" + code
-                    else:
-                        notebooks[language] = code
+                    if language in notebooks: notebooks[language] += "\n\n" + code
+                    else: notebooks[language] = code
                 
                 elif "let's run the code" in chunk.get("content").lower():
                     for language, code in notebooks.items():

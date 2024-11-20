@@ -55,7 +55,7 @@ class SambaNova:
                         if json_line.get("error"):
                             yield json_line.get("error", {}).get("message", "An unexpected error occured!")
                     
-                        options = json_line.get("choices")[0]
+                        options = json_line.get("choices", [{"finish_reason": "end_of_text"}])[0]
                         if options.get("finish_reason") == "end_of_text":
                             continue
 

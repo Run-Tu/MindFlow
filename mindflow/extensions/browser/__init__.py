@@ -5,7 +5,8 @@ from pathlib import Path
 from ...llm import LLM
 from ...utils import ROOT_DIR
 
-from .utils.general import to_markdown, get_relevant, uid
+from .utils.general import to_markdown
+from ...utils import get_relevant, generate_id
 import importlib
 import browsers
 import random
@@ -198,7 +199,7 @@ class Browser:
                 documents=contents,
                 metadatas=[{"source": "browser"} 
                            for _ in range(len(contents))], # filter on these!
-                ids=[f"doc-{uid()}" 
+                ids=[f"doc-{get_relevant()}" 
                      for _ in range(len(contents))], # unique for each doc
             )
         

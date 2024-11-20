@@ -78,6 +78,8 @@ class Computer:
             result = subprocess.run(command + [code], capture_output=True, text=True)
             if result.stdout or result.stderr:
                 return result.stdout.strip() + "\n" + result.stderr.strip()
+            if result.returncode == 0:
+                return (f"The following code did not generate any console text output, but may generate other output.")
             return (f"Command executed with exit code: {result.returncode}")
             
         except Exception as e:
