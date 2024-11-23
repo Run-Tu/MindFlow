@@ -14,8 +14,8 @@ class Speech:
             
         config = tts or {}
         if config.get("enabled"):
-            try: 
-                from .tts import TTS
-                self.tts = TTS(config, config.get("engine", "SystemEngine"))
-            except: 
-                print("An error occured: Disabling TTS.")
+            # try: 
+            from .tts import TTS
+            self.tts = TTS(config, config.get("engine", "SystemEngine"))
+            # except: 
+            #     print("An error occured: Disabling TTS.")

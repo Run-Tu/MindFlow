@@ -4,6 +4,8 @@ from playwright.async_api import async_playwright
 from pathlib import Path 
 from ...llm import LLM
 from ...utils import ROOT_DIR
+from ...memory.client import Memory
+from chromadb.config import Settings
 
 from .utils.general import to_markdown
 from ...utils import get_relevant, generate_id
@@ -27,6 +29,8 @@ class Browser:
         # points to current mindflow instance
         self.headless = headless
         self.llm = LLM()
+        self.context = Memory(settings=Settings(anonymized_telemetry=False))
+        self.browser_context = self.context.get_collection("cache")
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
             self.engines = json.load(f)
@@ -195,7 +199,7 @@ class Browser:
         if to_context:
             # temp, will improve
             contents = contents.split("###")
-            self.mindflow.collection.add(
+            self.browser_context.collection.add(
                 documents=contents,
                 metadatas=[{"source": "browser"} 
                            for _ in range(len(contents))], # filter on these!
@@ -232,7 +236,7 @@ class Browser:
                         for site in sites))
                     
         n = n*3 if 10 > n*3 else 9
-        relevant = get_relevant(self.mindflow.collection.query(query_texts=[query], 
+        relevant = get_relevant(self.browser_context.collection.query(query_texts=[query], 
                                                                 n_results=n),
                                 clean=True)
         
