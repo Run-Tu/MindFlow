@@ -1,6 +1,7 @@
 from mindflow.profile import Profile
-from mindflow.utils import USERNAME
+from mindflow.utils import USERNAME, ROOT_DIR
 from mindflow.extensions import BrowserKwargs
+from pathlib import Path
 
 profile: Profile = Profile(
     user = { 
@@ -20,8 +21,7 @@ profile: Profile = Profile(
         "auto_install": True 
     },
     paths = { 
-        "prompts": "core/prompts",
-        "memories": f"profiles/{USERNAME}/1.0.0"
+        "prompts": Path(ROOT_DIR, "core", "prompts"),
     },
     config = {
         "telemetry": False,

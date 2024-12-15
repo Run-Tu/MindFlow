@@ -1,25 +1,13 @@
 import argparse
 from .core import MindFlow
-from .utils import ROOT_DIR, merge_dicts
+from .utils import ROOT_DIR, merge_dicts, load_profile, lazy_import
 import asyncio
-import sys
-import importlib
 import os
 
 from .cli import main as run_cli
 
 from pathlib import Path
 from rich_argparse import RichHelpFormatter
-
-def load_profile(path: Path | str):
-    module_name = f"mindflow.parse_profile"
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(spec)
-    
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    
-    return getattr(module, "profile", {})
 
 def parse_args():
     from .profile.template import profile
@@ -29,7 +17,7 @@ def parse_args():
     RichHelpFormatter.styles["argparse.metavar"] = "#2a6284"
 
     parser = argparse.ArgumentParser(
-        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.2.0)[/dim]",
+        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.2.8)[/dim]",
         formatter_class=RichHelpFormatter
     )
     
@@ -55,25 +43,27 @@ def parse_args():
         profiles = set(profiles.name 
                        for profiles in Path(ROOT_DIR, "profiles").iterdir())
         print(f"Profiles Available: {profiles}")
+        exit()
         
     if args.verbose:
         profile["config"]["verbose"] = True
         
     if args.profile:
         # check if file exists
-        args_path = args.profile
-        if not Path(args_path).is_file():
+        args_path = Path(args.profile)
+        if not args_path.is_file():
             raise FileNotFoundError(f"Path to `{args.profile}` could not be found")
         
         # check for required fields
-        args_profile = load_profile(args.profile).get("user")
-            
-        if not args_profile:
+        args_profile = load_profile(args.profile)
+        user_profile = args_profile.get("user")
+        
+        if not user_profile:
             raise KeyError(f"`profile` field not found in `{args.profile}`")
         
         # check for duplicates
-        name, version = args_profile.get("name"), args_profile.get("version", "1.0.0")
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
+        name, version = user_profile.get("name"), user_profile.get("version", "1.0.0")
+        path = Path(ROOT_DIR, "profiles", name, version, "profile.json")
         
         if args.save:
             override = False
@@ -84,10 +74,11 @@ def parse_args():
                     raise FileExistsError("profile with the same name and version already exists")
             
             # copy file
-            with open(args_path, "r") as f: contents = f.read()
             path.parent.mkdir(parents=True, exist_ok=True)
             path.touch()
-            with open(path, "w") as f: f.write(contents) 
+            json = lazy_import("json", optional=False)
+            with open(path, "w") as f: 
+                f.write(json.dumps(args_profile)) 
             
             with open(Path(ROOT_DIR, ".env"), "w") as f:
                 f.write(f'API_KEY="{os.environ["API_KEY"]}"')
@@ -117,7 +108,7 @@ def parse_args():
         elif not version in versions:
             raise KeyError("Version does not exist.") 
         
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.py")
+        path = Path(ROOT_DIR, "profiles", name, version, "profile.json")
         
         with open(Path(ROOT_DIR, ".env"), "w") as f:
             f.write(f'API_KEY="{os.environ["API_KEY"]}"')

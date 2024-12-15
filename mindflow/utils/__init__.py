@@ -1,15 +1,14 @@
 import subprocess
 import importlib.util
-import toml
-import sys
+
 from pathlib import Path
-import os
 import platform
+import sys
+import os
+import re
 
 import random
 import string
-from functools import partial as config
-import numpy as np
 
 # constants
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -22,15 +21,64 @@ def is_installed(package):
     spec = importlib.util.find_spec(package)
     return spec is not None
 
-def load_profile(path: Path | str):
+def python_load_profile(path: Path | str):
     module_name = f"mindflow.parse_profile"
     spec = importlib.util.spec_from_file_location(module_name, path)
     module = importlib.util.module_from_spec(spec)
     
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
-    
+
     return getattr(module, "profile", {})
+
+def load_profile(profile_path):
+    if profile_path is None:
+        return {}
+    
+    profile_path = Path(profile_path)
+    if not profile_path.is_file():
+        return {}
+    
+    suffix = profile_path.suffix.lower()
+    with open(profile_path, "r") as f:
+        if suffix == ".json":
+            return lazy_import("json").load(f)
+        elif suffix in {".yaml", ".yml"}:
+            return lazy_import("yaml").safe_load(f)
+        elif suffix == ".toml":
+            return lazy_import("toml").load(f)
+        elif suffix in {".py", ".pyw"}:
+            return python_load_profile(profile_path)
+        
+    return {}
+
+def re_format(text, replacements, pattern=r'\{([a-zA-Z0-9_]+)\}', strict=False):
+    matches = set(re.findall(pattern, text))
+    if strict and (missing := matches - set(replacements.keys())):
+        raise ValueError(f"Missing replacements for: {', '.join(missing)}")
+
+    for match in matches & set(replacements.keys()):
+        text = re.sub(r'\{' + match + r'\}', str(replacements[match]), text)
+    return text
+
+def load_prompts(dir, 
+                 info: dict = {},
+                 conversational: bool = False):
+    prompts = {}
+
+    for filename in Path(dir).iterdir():
+        if not filename.is_file():
+            continue
+
+        name = filename.stem
+        with open(Path(dir, filename), "r") as f:
+            prompts[name] = re_format(f.read().strip(), info)
+
+    prompts['initial'] += "\n\n" + prompts['instructions']
+    if conversational:
+        prompts['initial'] += "\n\n" + prompts['conversational']
+
+    return prompts
 
 def Kwargs(**kwargs):
     return kwargs
@@ -122,23 +170,6 @@ def merge_dicts(dict1, dict2):
             dict1[key] = value  
     return dict1
 
-def load_settings(file: str | Path = None, settings=None, section=None, verbose=False):
-    if settings is None:
-        config_default = Path(ROOT_DIR, "profile.template.toml")
-        with open(config_default, "r") as f:
-            settings = toml.load(f)
-            
-        if file:
-            config = Path(file)
-            if config.is_file():
-                with open(config, "r") as f:
-                    if (setting := toml.load(f)):
-                        settings = merge_dicts(settings, setting)
-            elif verbose:
-                print("config.toml not found, using config.defaults.toml instead!")
-
-    return settings.get(section, settings) if section else settings
-
 def generate_id(length=8):
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
@@ -147,6 +178,10 @@ def get_relevant(document: dict, threshold: float = 1.125, clean=False):
     # temp, filter by distance
     # future, density based retrieval relevance 
     # https://github.com/chroma-core/chroma/blob/main/chromadb/experimental/density_relevance.ipynb
+    
+    np = lazy_import("numpy",
+                     install=True,
+                     optional=False)
 
     mask = np.array(document['distances']) <= threshold
     keys = tuple(set(document) & set(('distances', 'documents', 'metadatas', 'ids')))

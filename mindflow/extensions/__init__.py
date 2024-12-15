@@ -10,8 +10,9 @@ def load_extensions():
         extensions = f.read().splitlines()
     
     for module_name in extensions:
-        globals()[module_name] = getattr(importlib.import_module(module_name), module_name.title())
-        if (kwargs := getattr(importlib.import_module(module_name), module_name.title()+"Kwargs")):
+        module = importlib.import_module(module_name)
+        globals()[module_name] = getattr(module, module_name.title())
+        if (kwargs := getattr(module, module_name.title()+"Kwargs")):
             globals()[module_name+"Kwargs"] = kwargs
 
 load_extensions()

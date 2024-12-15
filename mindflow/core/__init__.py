@@ -3,7 +3,7 @@ from ..profile import Profile
 from ..profile.template import profile as default_profile
 
 from ..llm import LLM, to_lmc, to_chat, interpret_input
-from ..utils import ROOT_DIR, OS, generate_id, get_relevant
+from ..utils import ROOT_DIR, OS, generate_id, get_relevant, load_profile, load_prompts
 
 from ..memory.server import Manager
 from ..memory.client import Memory
@@ -26,6 +26,7 @@ class MindFlow:
     def __init__(
             self,
             profile: Profile = None,
+            profile_path: Path | str = None,
             messages: list | None = None,
             prompts_dir: Path | None = None,
             memories_dir: Path | None = None,
@@ -41,7 +42,7 @@ class MindFlow:
             extensions: dict = {},
             breakers = ("the task is done.", "the conversation is done.")) -> None:
         
-        profile = profile or default_profile
+        profile = profile or load_profile(profile_path) or default_profile
         self.profile = profile
         
         # setup other instances
@@ -75,47 +76,33 @@ class MindFlow:
         
         # setup paths
         paths = self.profile["paths"]
-        self.prompts_dir = prompts_dir or ROOT_DIR / Path(paths["prompts"])
-        self.memories_dir = memories_dir or ROOT_DIR / Path(paths["memories"])
+        self.prompts_dir = prompts_dir or paths.get("prompts")
+        self.memories_dir = memories_dir or paths.get("memories") or Path(ROOT_DIR, "profiles", self.info["username"], self.info["version"])
         
         # setup memory
         self.memory_manager = Manager(path=self.memories_dir, telemetry=telemetry)
-        self.memory_thread = self.memory_manager.serve()
+        self.memory_manager.serve()
         
-        self.memory = Memory(settings=Settings(anonymized_telemetry=telemetry))
-        self.ltm = self.memory.get_collection("ltm")
-        self.cache = self.memory.get_collection("cache")
+        self.memory = Memory(host='localhost', 
+                             port=8000,
+                             settings=Settings(anonymized_telemetry=telemetry))
+        self.ltm = self.memory.get_or_create_collection("ltm")
+        self.cache = self.memory.get_or_create_collection("cache")
         
         # experimental (not yet implemented)
         self.local = local or profile["config"]["local"]
 
         # setup prompts
-        self.prompts = {}
-        
-        prompts = os.listdir(self.prompts_dir)
-        for filename in prompts:
-            name = filename.split('.')[0]    
-            with open(Path(self.prompts_dir, filename), "r") as f:
-                self.prompts[name] = f.read().strip()
-            
-            if name == "memorise":
-                continue
-            
-            replacements = {
-                replace: self.info.get(replace)
-                for replace in re.findall(r'\{(.*?)\}', self.prompts[name])
-            }
-            self.prompts[name] = self.prompts[name].format(**replacements)
-            
-        self.prompts['initial'] += "\n\n" + self.prompts['instructions']
-        if self.conversational:
-            self.prompts['initial'] += "\n\n" + self.prompts['conversational']
+        self.prompts = load_prompts(self.prompts_dir, 
+                                    self.info, 
+                                    self.conversational)
             
         # setup llm
         self.name = profile['assistant']["name"]
-        self.llm = LLM(messages=messages, 
-                       verbose=verbose, 
-                       system=self.prompts['initial']) if llm is None else llm
+        self.llm = llm or LLM(messages=messages, 
+                              verbose=verbose, 
+                              system=self.prompts['initial']) 
+        
         self.loop = asyncio.get_event_loop()
         
     async def remember(self, message):
@@ -139,18 +126,18 @@ class MindFlow:
         return memories
     
     def add_memory(self, memory):
+        # check if ai fails to format json
         try: memory = json.loads(memory)
         except: return
         
-        if not memory.get("memory"): return
+        # check memory defined correctly
+        if not memory.get("memory"): 
+            return
             
-        kwargs = {}
-        if memory.get("memory"):
-            kwargs["documents"] = memory["memory"]
-        if memory.get("metadata"):
-            kwargs["metadatas"] = memory["metadata"] | {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-        if kwargs:
-            kwargs["ids"] = [generate_id()]
+        kwargs = {"documents": [memory["memory"]],
+                  "ids": [generate_id()],
+                  "metadatas": [memory.get("metadata", {}) | 
+                                {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]}
         self.ltm.add(**kwargs)
 
         

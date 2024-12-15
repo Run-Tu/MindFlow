@@ -3,7 +3,6 @@ from pathlib import Path
 import threading
 import chromadb
 from chromadb.config import Settings
-import time
 
 class Manager:
     def __init__(self, 
@@ -30,12 +29,11 @@ class Manager:
         )
         
     def serve(self):
-        threading.Thread(target=self.run).start()
+        threading.Thread(target=self.run, daemon=True).start()
         while not self.process:
             pass
             
-            
         for line in iter(self.process.stdout.readline, ''):
+            #print(line, end='')
             if f"running on http://localhost:{self.port}" in line:
                 return
-            # print(line, end='')
