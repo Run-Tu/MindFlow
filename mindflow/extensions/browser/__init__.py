@@ -1,11 +1,15 @@
 import asyncio
-from playwright.async_api import async_playwright
 
 from pathlib import Path 
 from ...llm import LLM
-from ...utils import ROOT_DIR
+from ...utils import ROOT_DIR, lazy_import
 from ...memory.client import Memory
 from chromadb.config import Settings
+
+# playwright = lazy_import("playwright",
+#                          scripts=[["playwright", "install"]])
+
+from playwright.async_api import async_playwright
 
 from .utils.general import to_markdown
 from ...utils import get_relevant, generate_id
@@ -22,15 +26,19 @@ class BrowserKwargs(TypedDict):
     engine: str
 
 class Browser:
-    def __init__(self, headless=True, engine="google"):
+    def __init__(self, 
+                 headless=True, 
+                 engine="google"):
         # Temp solution, loads widgets from ALL engines
         # Should only load widgets from chosen engine
         
         # points to current mindflow instance
         self.headless = headless
         self.llm = LLM()
-        self.context = Memory(settings=Settings(anonymized_telemetry=False))
-        self.browser_context = self.context.get_collection("cache")
+        self.context = Memory(host='localhost', 
+                              port=8000,
+                              settings=Settings(anonymized_telemetry=False))
+        self.browser_context = self.context.get_or_create_collection("cache")
 
         with open(Path(__file__).parent / "src" / "engines.json", "r") as f:
             self.engines = json.load(f)
@@ -86,7 +94,10 @@ class Browser:
 
             await self.init_gecko()
         else:
-            await self.init_chromium(browser, path, browser_type)
+            try:
+                await self.init_chromium(browser, path, browser_type)
+            except:
+                await self.init_gecko()
     
         if not self.browser:
             raise Exception("Browser initialization failed.")
@@ -102,14 +113,19 @@ class Browser:
                                                                                 user_agent=self.user_agent,
                                                                                 user_data_dir=profile_path)
         
+        # await self.browser.route("**/*", self.handle_route)
+        
+        
     async def init_gecko(self): 
         # doesn't support user profiles
         # because of playwright bug with gecko based browsers 
         
         self.browser = await self.playwright.firefox.launch_persistent_context(headless=self.headless,
                                                                                user_agent=self.user_agent)
+        
+        # await self.browser.route("**/*", self.handle_route)
     
-    async def check_visibility_while_waiting(self, page, check_selector, wait_selector, timeout=30000):
+    async def check_visibility_while_waiting(self, page, check_selector, wait_selector, timeout=60000):
         start_time = asyncio.get_event_loop().time()
         end_time = start_time + timeout / 1000
 
@@ -123,7 +139,13 @@ class Browser:
                 pass  # wait_selector did not appear within the timeout
 
         return False  # Timeout reached, return False
-
+    
+    def handle_route(self, route, request):
+        ignore = list(self.settings["search"]["ignore_resources"])
+        if any(request.url.endswith(ext) for ext in ignore):
+            route.abort()
+        else:
+            route.continue_()
     
     def perplexity_search(self, query: str): 
         return self.loop.run_until_complete(self.run_perplexity_search(query))
@@ -199,11 +221,11 @@ class Browser:
         if to_context:
             # temp, will improve
             contents = contents.split("###")
-            self.browser_context.collection.add(
+            self.browser_context.add(
                 documents=contents,
                 metadatas=[{"source": "browser"} 
                            for _ in range(len(contents))], # filter on these!
-                ids=[f"doc-{get_relevant()}" 
+                ids=[generate_id()
                      for _ in range(len(contents))], # unique for each doc
             )
         
@@ -236,7 +258,7 @@ class Browser:
                         for site in sites))
                     
         n = n*3 if 10 > n*3 else 9
-        relevant = get_relevant(self.browser_context.collection.query(query_texts=[query], 
+        relevant = get_relevant(self.browser_context.query(query_texts=[query], 
                                                                 n_results=n),
                                 clean=True)
         
@@ -284,8 +306,9 @@ class Browser:
 
     
     def parallel(self, *funcs, void=False):
+        results = self.loop.run_until_complete(self.run_parallel(*funcs)) 
         if not void:
-            return self.loop.run_until_complete(self.run_parallel(*funcs)) 
+            return results 
         
     async def run_parallel(self, *funcs):
         return tuple(await asyncio.gather(*funcs))

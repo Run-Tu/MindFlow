@@ -15,7 +15,7 @@ def to_chat(lmc: dict, content = True) -> str:
     time = datetime.now().strftime("%I:%M %p %d/%m/%Y")
     display = f"[bold #4a4e54]\u25CB ({time})[/bold #4a4e54] [italic bold]{_role}[/italic bold]"
     if content:
-        return (display, Markdown(_content))
+        return (display, _content)
     return display
 
 async def main(macro):

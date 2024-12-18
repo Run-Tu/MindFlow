@@ -81,12 +81,15 @@ class MindFlow:
         
         # setup memory
         self.memory_manager = Manager(path=self.memories_dir, telemetry=telemetry)
-        self.memory_manager.serve()
+        self.memory_manager.serve_and_wait()
         
         self.memory = Memory(host='localhost', 
                              port=8000,
                              settings=Settings(anonymized_telemetry=telemetry))
         self.ltm = self.memory.get_or_create_collection("ltm")
+        
+        # restart stm cache
+        self.memory.delete_collection(name="cache")
         self.cache = self.memory.get_or_create_collection("cache")
         
         # experimental (not yet implemented)
@@ -107,8 +110,8 @@ class MindFlow:
         
     async def remember(self, message):
         document = self.ltm.query(query_texts=[message],
-                                  n_results=3,
-                                  include=["documents", "metadatas", "distances"])
+                                    n_results=3,
+                                    include=["documents", "metadatas", "distances"])
         
         # filter by distance
         snapshot = get_relevant(document, threshold=1.45)
@@ -118,7 +121,7 @@ class MindFlow:
         
         memories = []
         for document, metadata in zip(snapshot.get("documents", []),
-                                      snapshot.get("metadatas", [])):
+                                        snapshot.get("metadatas", [])):
             text = f"{document}\n[metadata: {metadata}]"
             memories.append(to_lmc(text, role="Memory", type="memory snapshot"))
         

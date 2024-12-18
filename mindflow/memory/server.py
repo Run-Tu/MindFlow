@@ -1,6 +1,5 @@
 import subprocess
 from pathlib import Path
-import threading
 import chromadb
 from chromadb.config import Settings
 
@@ -14,26 +13,23 @@ class Manager:
         self.path = path
         self.collections = collections or ["ltm", "cache"]
         self.process = None
-        
+
         if not Path(path).is_dir():
             client = chromadb.PersistentClient(str(path), Settings(anonymized_telemetry=telemetry))
             for collection in self.collections:
                 client.create_collection(name=collection)
     
-    def run(self):
+    def serve(self):
         self.process = subprocess.Popen(
             ["chroma", "run", "--path", str(self.path), "--port", str(self.port)], 
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE,
             text=True
         )
-        
-    def serve(self):
-        threading.Thread(target=self.run, daemon=True).start()
-        while not self.process:
-            pass
-            
+
+    def serve_and_wait(self):
+        self.serve() 
         for line in iter(self.process.stdout.readline, ''):
-            #print(line, end='')
+            # print(line, end='')
             if f"running on http://localhost:{self.port}" in line:
-                return
+                break
