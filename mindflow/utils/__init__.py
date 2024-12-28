@@ -9,6 +9,7 @@ import re
 
 import random
 import string
+import toml
 
 # constants
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +18,23 @@ USERNAME = os.getlogin()
 SYSTEM = platform.system()
 OS = f"{SYSTEM} {platform.version()}"
 
+def env_safe_replace(path: Path | str, 
+                     variables: dict):
+    
+    if not Path(path).is_file():
+        raise FileNotFoundError("Path to `.env` not found.")
+    
+    with open(path, "r") as f:
+        env = toml.load(f)
+        
+    with open(path, "w") as f:
+        f.write(toml.dumps(
+            env | variables
+        ))
+        
+    for key, value in variables.items():
+        os.environ[key] = value
+    
 def is_installed(package):
     spec = importlib.util.find_spec(package)
     return spec is not None
@@ -31,12 +49,68 @@ def python_load_profile(path: Path | str):
 
     return getattr(module, "profile", {})
 
-def load_profile(profile_path):
+def init_profile(profile: dict, 
+                 memories_dir: Path | str):
+    
+    name, version = profile["user"]["name"], profile["user"]["version"]
+    
+    # if profile already initialised
+    if Path(memories_dir).is_dir():
+        if os.getenv("PROFILE") == f"{name}:{version}":
+            return
+        
+        # collision
+        override = input("Another profile with the same name and version already exists. " +
+                         "Override profile? (y/n)").startswith("y")
+        if not override:
+            raise FileExistsError("profile with the same name and version already exists")
+    
+    memories_dir.mkdir(parents=True, exist_ok=True)
+    original_profile_path = str(profile["env"].get("path", ""))
+    
+    # clean paths
+    profile["env"]["path"] = original_profile_path
+    for key, path in profile["paths"].items():
+        profile["paths"][key] = str(path)
+        
+    path = Path(memories_dir, "profile.json")
+    path.touch()
+    
+    json = lazy_import("json")
+    with open(path, "w") as f: 
+        f.write(json.dumps(profile)) 
+        
+    env = Path(memories_dir.parent, ".env")
+    env.touch()
+    
+    api_key = profile["env"].get("api_key") or os.getenv("API_KEY")
+    if not api_key:
+        raise ValueError("API_KEY for LLM not provided. Get yours for free from https://cloud.sambanova.ai/")
+    
+    # fall-back
+    if not os.getenv("API_KEY"):
+        env_safe_replace(Path(ROOT_DIR, ".env"), 
+                         {"API_KEY": api_key})
+    
+    env_safe_replace(env,
+                    {"ORIGINAL_PROFILE_PATH": original_profile_path,
+                    "API_KEY": api_key})
+    
+    env_safe_replace(Path(ROOT_DIR, ".env"), 
+                     {"PROFILE": f"{name}:{version}"})
+    
+    os.environ["PROFILE"] = f"{name}:{version}"
+            
+
+def load_profile(profile_path: Path | str,
+                 strict=False):
     if profile_path is None:
         return {}
     
     profile_path = Path(profile_path)
     if not profile_path.is_file():
+        if strict:
+            raise FileNotFoundError(f"Path to `{profile_path}` does not exist") 
         return {}
     
     suffix = profile_path.suffix.lower()

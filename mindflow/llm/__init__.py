@@ -1,9 +1,6 @@
 from datetime import datetime
 from .models.samba import SambaNova
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import re
 

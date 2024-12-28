@@ -1,6 +1,6 @@
 import argparse
 from .core import MindFlow
-from .utils import ROOT_DIR, merge_dicts, load_profile, lazy_import
+from .utils import ROOT_DIR, merge_dicts, load_profile, lazy_import, env_safe_replace
 import asyncio
 import os
 
@@ -9,118 +9,137 @@ from .cli import main as run_cli
 from pathlib import Path
 from rich_argparse import RichHelpFormatter
 
-def parse_args():
-    from .profile.template import profile
-    
-    RichHelpFormatter.styles["argparse.groups"] = "bold"
-    RichHelpFormatter.styles["argparse.args"] = "#79c0ff"
-    RichHelpFormatter.styles["argparse.metavar"] = "#2a6284"
+from dotenv import load_dotenv
+load_dotenv()
 
-    parser = argparse.ArgumentParser(
-        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.2.8)[/dim]",
-        formatter_class=RichHelpFormatter
-    )
-    
-    parser.add_argument("--default", action="store_true", help="Switch back to default settings.")
-    parser.add_argument("--api_key", metavar='<api_key>', type=str, help="Set your API KEY for SambaNova API.")
-    parser.add_argument("--save", action="store_true", help="Save current `profile.toml` settings for future uses.")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose mode for debugging.")
-    parser.add_argument("--profile", metavar='<path>', type=str, help="Path to a `profile.toml` file for custom settings.")
-    parser.add_argument("--profiles", action="store_true", help="List all available `profiles`.")
-    parser.add_argument("--switch", metavar='<name>:<version>', type=str, help="Switch to a different profile's custom settings.")
-
-    args = parser.parse_args()
-    Path(ROOT_DIR, "profiles").mkdir(exist_ok=True) 
-    path: Path | str = ""
-    
-    if args.api_key:
-        with open(Path(ROOT_DIR, ".env"), "w") as f:
-            f.write(f'API_KEY="{args.api_key}"')
-            if profile: f.write(f'\nPROFILE="{profile}"')
-        os.environ["API_KEY"] = args.api_key
+class ArgumentParser(argparse.ArgumentParser):
+    def __init__(self,
+                 styles: dict,
+                 default: dict,
+                 *args, **kwargs):
         
-    if args.profiles:
+        self.default = default
+        self.profile = default
+        Path(ROOT_DIR, ".env").touch()
+        for title, style in styles.items():
+            RichHelpFormatter.styles[title] = style
+        
+        super().__init__(formatter_class=RichHelpFormatter, 
+                         *args, **kwargs)
+        
+        self.add_argument("--profiles", action="store_true", help="List all available `profiles`.")
+        self.add_argument("--versions", metavar='<name>', help="List all available `versions` in a certain `profile`.")
+        
+        self.add_argument("--profile", metavar='<path>', type=str, help="Add custom profile to mindflow.")
+        self.add_argument("--update", metavar='<name>', help="Update changes made in profile.")
+        self.add_argument("--path", metavar='<path>', help="Add original path to profile for quick updates [BETA].")
+        self.add_argument("--switch", metavar='<name>:<version>', type=str, help="Switch to a different profile's custom settings.")
+        
+        self.add_argument("--default", action="store_true", help="Switch back to default settings.")
+        
+        self.add_argument("--api_key", metavar='<api_key>', type=str, help="Set your API KEY for SambaNova API.")
+        self.add_argument("--verbose", action="store_true", help="Enable verbose mode for debugging.")
+
+    def parse(self) -> dict:
+        if os.getenv("PROFILE"):
+            self.parse_switch(os.getenv("PROFILE"))
+
+        args = vars(self.parse_args())
+        for arg, value in args.items():
+            if value:
+                getattr(self, "parse_" + arg)(value)
+            
+        return self.profile
+    
+    def parse_switch(self, value):
+        value = value.split(":")
+        name, version = value[0], value[-1]
+        
+        path = Path(ROOT_DIR, "profiles", name)
+        if not path.is_dir():
+            raise FileNotFoundError(f"Profile `{value}` does not exist")
+        
+        if not len(value) == 2:
+            versions = [versions.name for versions in Path(ROOT_DIR, "profiles", name).iterdir()]
+            version = sorted(versions)[-1]
+        
+        env_safe_replace(Path(ROOT_DIR, ".env"),
+                        {"PROFILE":f"{name}:{version}"})
+        
+        self.profile = merge_dicts(self.profile, load_profile(Path(path, version, "profile.json")))
+        
+    def parse_path(self, value):
+        name, version = os.getenv("PROFILE", "").split(":") or ("User", "1.0.0")
+        env = Path(ROOT_DIR, "profiles", name, ".env")
+        env.parent.mkdir(exist_ok=True) 
+        env.touch()
+        env_safe_replace(env, {"ORIGINAL_PROFILE_PATH": value})
+    
+    def parse_api_key(self, value):
+        self.profile["env"]["api_key"] = value
+        
+    def parse_verbose(self, value):
+        self.profile["config"]["verbose"] = True
+    
+    def parse_default(self, value):
+        self.profile = self.default
+    
+    def parse_profiles(self, value):
         profiles = set(profiles.name 
                        for profiles in Path(ROOT_DIR, "profiles").iterdir())
         print(f"Profiles Available: {profiles}")
-        exit()
-        
-    if args.verbose:
-        profile["config"]["verbose"] = True
-        
-    if args.profile:
-        # check if file exists
-        args_path = Path(args.profile)
-        if not args_path.is_file():
-            raise FileNotFoundError(f"Path to `{args.profile}` could not be found")
-        
-        # check for required fields
-        args_profile = load_profile(args.profile)
-        user_profile = args_profile.get("user")
-        
-        if not user_profile:
-            raise KeyError(f"`profile` field not found in `{args.profile}`")
-        
-        # check for duplicates
-        name, version = user_profile.get("name"), user_profile.get("version", "1.0.0")
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.json")
-        
-        if args.save:
-            override = False
-            if Path(path).is_file():
-                override = input("""It seems another profile with the same name and version already exists. Would you like to override this profile? (y/n)""").startswith("y")
-            
-                if not override:
-                    raise FileExistsError("profile with the same name and version already exists")
-            
-            # copy file
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.touch()
-            json = lazy_import("json", optional=False)
-            with open(path, "w") as f: 
-                f.write(json.dumps(args_profile)) 
-            
-            with open(Path(ROOT_DIR, ".env"), "w") as f:
-                f.write(f'API_KEY="{os.environ["API_KEY"]}"')
-                f.write(f'\nPROFILE="{name}:{version}"')
-            os.environ["PROFILE"] = f"{name}:{version}"
-                
-    if args.default:
-        return profile | {"path": Path(ROOT_DIR, "profile", "template.py")}
-        
-    if (args_profile := args.switch) or (args_profile := os.environ.get("PROFILE")):
-        
-        args_profile = args_profile.split(":")
-        if len(args_profile) >= 2: name, version = args_profile[0], args_profile[-1]
-        else: name, version = args_profile[0], None
-          
-        profiles = set(profiles.name 
-                       for profiles in Path(ROOT_DIR, "profiles").iterdir())
-        
-        if not name in profiles:
-            raise KeyError("Profile does not exist.") 
-        
-        versions = set(versions.name
-                       for versions in Path(ROOT_DIR, "profiles", name).iterdir())
-        
-        if not version:
-            version = sorted(list(versions))[-1]
-        elif not version in versions:
-            raise KeyError("Version does not exist.") 
-        
-        path = Path(ROOT_DIR, "profiles", name, version, "profile.json")
-        
-        with open(Path(ROOT_DIR, ".env"), "w") as f:
-            f.write(f'API_KEY="{os.environ["API_KEY"]}"')
-            f.write(f'\nPROFILE="{name}:{version}"')
-        os.environ["PROFILE"] = f"{name}:{version}"
     
-    if path:
-        return merge_dicts(profile, load_profile(path)) | {"path": path}
-    return profile | {"path": Path(ROOT_DIR, "profile", "template.py")}
+    def parse_versions(self, value):
+        profiles = set(profiles.name 
+                       for profiles in Path(ROOT_DIR, "profiles", value).iterdir()
+                       if profiles.is_dir())
+        print(f"Versions Available: {profiles}")
+        
+    def parse_update(self, name):
+        toml = lazy_import("toml")
+        env = Path(ROOT_DIR, "profiles", name, ".env")
+        
+        if not env.is_file():
+            raise FileNotFoundError("`.env` missing from profile. Add `.env` by calling `macro --path <path>`.")
+        
+        with open(env, "r") as f:
+            args_path = Path(toml.load(f)["ORIGINAL_PROFILE_PATH"])
+            
+        if not args_path.is_file():
+            raise FileNotFoundError(f"Original profile path `{args_path}` has been moved. Update original profile path by calling `macro --path <path>`.")
+        
+        profile = load_profile(args_path)
+        versions = [versions.name
+                    for versions in Path(ROOT_DIR, "profiles", name).iterdir()]
+        latest = sorted(versions)[-1]
 
+        if latest > (version := profile["user"].get("version", "1.0.0")):
+            version = latest
+            
+        major, minor, patch = map(int, version.split("."))
+        profile["user"]["version"] = f"{major}.{minor}.{patch+1}"
+        
+        self.profile = merge_dicts(self.profile, profile)
+        
+    def parse_profile(self, path):
+        self.profile = merge_dicts(self.profile, load_profile(path))
+        self.profile["env"]["path"] = path
+    
 def main():
-    profile = parse_args()
+    Path(ROOT_DIR, "profiles").mkdir(exist_ok=True) 
+    from .profile.template import profile
+    
+    parser = ArgumentParser(
+        styles={
+            "argparse.groups":"bold",
+            "argparse.args": "#79c0ff",
+            "argparse.metavar": "#2a6284"
+            },
+        default=profile,
+        description="[#92c7f5]O[/#92c7f5][#8db9fe]pe[/#8db9fe][#9ca4eb]nm[/#9ca4eb][#bbb2ff]a[/#bbb2ff][#d3aee5]cr[/#d3aee5][#caadea]o[/#caadea] is a multimodal assistant, code interpreter, and human interface for computers. [dim](0.2.8)[/dim]",
+        )
+    
+    profile = parser.parse()
     macro = MindFlow(profile)
     asyncio.run(run_cli(macro))
 

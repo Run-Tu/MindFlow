@@ -9,8 +9,8 @@ profile: Profile = Profile(
         "version": "1.0.0"
     },
     assistant = {
-        "name": "Basil",
-        "personality": "You have a kind, deterministic and professional attitude towards your work and respond in a concise, short, formal, yet casual manner.",
+        "name": "Macro",
+        "personality": "You respond in a professional attitude and respond in a formal, yet casual manner.",
         "messages": [],
         "breakers": ["the task is done.", 
                      "the conversation is done."]
@@ -35,7 +35,10 @@ profile: Profile = Profile(
         "Browser": BrowserKwargs(engine="google")
     },
     tts = {
-        "enabled": False,
+        "enabled": True,
         "engine": "SystemEngine"
+    },
+    env = {
+        
     }
 )

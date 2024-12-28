@@ -3,7 +3,7 @@ from ..profile import Profile
 from ..profile.template import profile as default_profile
 
 from ..llm import LLM, to_lmc, to_chat, interpret_input
-from ..utils import ROOT_DIR, OS, generate_id, get_relevant, load_profile, load_prompts
+from ..utils import ROOT_DIR, OS, generate_id, get_relevant, load_profile, load_prompts, init_profile
 
 from ..memory.server import Manager
 from ..memory.client import Memory
@@ -14,9 +14,8 @@ from pathlib import Path
 import threading
 import asyncio
 import json
-import os
-import re
 
+from dotenv import load_dotenv
 
 class MindFlow:
     """
@@ -44,6 +43,17 @@ class MindFlow:
         
         profile = profile or load_profile(profile_path) or default_profile
         self.profile = profile
+        
+        # setup paths
+        paths = self.profile["paths"]
+        self.prompts_dir = prompts_dir or paths.get("prompts")
+        self.memories_dir = memories_dir or paths.get("memories") or Path(ROOT_DIR, "profiles", profile["user"]["name"], profile["user"]["version"])
+        
+        load_dotenv()
+        load_dotenv(dotenv_path=Path(self.memories_dir.parent, ".env"))
+        
+        init_profile(self.profile, 
+                     self.memories_dir)
         
         # setup other instances
         self.computer = computer or Computer(profile_path=profile.get("path", None),
@@ -74,11 +84,6 @@ class MindFlow:
             "extensions": extensions or self.computer.load_instructions()
         }
         
-        # setup paths
-        paths = self.profile["paths"]
-        self.prompts_dir = prompts_dir or paths.get("prompts")
-        self.memories_dir = memories_dir or paths.get("memories") or Path(ROOT_DIR, "profiles", self.info["username"], self.info["version"])
-        
         # setup memory
         self.memory_manager = Manager(path=self.memories_dir, telemetry=telemetry)
         self.memory_manager.serve_and_wait()
@@ -89,7 +94,7 @@ class MindFlow:
         self.ltm = self.memory.get_or_create_collection("ltm")
         
         # restart stm cache
-        self.memory.delete_collection(name="cache")
+        # self.memory.delete_collection(name="cache")
         self.cache = self.memory.get_or_create_collection("cache")
         
         # experimental (not yet implemented)
