@@ -1,6 +1,8 @@
 import subprocess
 import importlib.util
 
+import getpass
+
 from pathlib import Path
 import platform
 import sys
@@ -14,7 +16,7 @@ import toml
 # constants
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PLATFORM = platform.uname()
-USERNAME = os.getlogin()
+USERNAME = getpass.getuser()
 SYSTEM = platform.system()
 OS = f"{SYSTEM} {platform.version()}"
 
