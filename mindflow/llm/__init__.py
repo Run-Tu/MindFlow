@@ -1,4 +1,5 @@
 from datetime import datetime
+from .models.minimax import MiniMax
 from .models.samba import SambaNova
 
 import os
@@ -62,19 +63,50 @@ def to_chat(lmc: dict, logs=False) -> str:
     return f'({time}) [type: {_type if _format is None else f"{_type}, format: {_format}"}] *{_role}*: {_content}'
 
 class LLM:
-    def __init__(self, verbose=False, messages: list = None, system=""):
+    def __init__(self,
+                 verbose=False,
+                 messages: list = None,
+                 system="",
+                 provider=None,
+                 api_key=None,
+                 model=None,
+                 region=None,
+                 base_url=None,
+                 endpoint=None):
         self.system = system
 
         self.verbose = verbose
 
-        if not (api_key := os.getenv('API_KEY')) :
-            raise Exception("API_KEY for LLM not provided. Get yours for free from https://cloud.sambanova.ai/")
-        
-        self.llm = SambaNova(api_key=api_key,
-                             model="Meta-Llama-3.1-405B-Instruct",
-                             remember=True,
-                             system=self.system,
-                             messages=[] if messages is None else messages)
+        self.provider = (provider or os.getenv("LLM_PROVIDER", "sambanova")).lower()
+        if self.provider == "minimax":
+            api_key = api_key or os.getenv("MINIMAX_API_KEY") or os.getenv("API_KEY")
+            if not api_key:
+                raise Exception("API_KEY for MiniMax LLM not provided.")
+
+            self.llm = MiniMax(
+                api_key=api_key,
+                model=model or os.getenv("MINIMAX_MODEL") or "MiniMax-M3",
+                region=region or os.getenv("MINIMAX_REGION") or "global_en",
+                base_url=base_url or os.getenv("MINIMAX_BASE_URL"),
+                endpoint=endpoint or os.getenv("MINIMAX_ENDPOINT"),
+                remember=True,
+                system=self.system,
+                messages=[] if messages is None else messages,
+            )
+        elif self.provider == "sambanova":
+            api_key = api_key or os.getenv("API_KEY")
+            if not api_key:
+                raise Exception("API_KEY for LLM not provided. Get yours for free from https://cloud.sambanova.ai/")
+
+            self.llm = SambaNova(api_key=api_key,
+                                 model=model or "Meta-Llama-3.1-405B-Instruct",
+                                 endpoint=endpoint or "https://api.sambanova.ai/v1/chat/completions",
+                                 remember=True,
+                                 system=self.system,
+                                 messages=[] if messages is None else messages)
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+
         self.messages = self.llm.messages
             
     def chat(self, *args, **kwargs):
