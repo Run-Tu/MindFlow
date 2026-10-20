@@ -85,7 +85,7 @@ class LLM:
 
             self.llm = MiniMax(
                 api_key=api_key,
-                model=model or os.getenv("MINIMAX_MODEL") or "MiniMax-M3",
+                model=model or os.getenv("MINIMAX_MODEL") or MiniMax.default_model,
                 region=region or os.getenv("MINIMAX_REGION") or "global_en",
                 base_url=base_url or os.getenv("MINIMAX_BASE_URL"),
                 endpoint=endpoint or os.getenv("MINIMAX_ENDPOINT"),

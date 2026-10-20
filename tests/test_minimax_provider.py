@@ -17,7 +17,8 @@ class MiniMaxProviderTests(unittest.TestCase):
         asyncio.set_event_loop(None)
 
     def test_models_and_regional_endpoints(self):
-        self.assertEqual(available(), {"MiniMax-M3", "MiniMax-M2.7"})
+        self.assertEqual(available(), {"MiniMax-M3.1-Flash", "MiniMax-M3"})
+        self.assertEqual(MiniMax(api_key="test-key").model, "MiniMax-M3.1-Flash")
 
         global_client = MiniMax(api_key="test-key", model="MiniMax-M3")
         cn_client = MiniMax(

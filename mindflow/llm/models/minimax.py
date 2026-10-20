@@ -2,12 +2,12 @@ from .samba import SambaNova
 
 
 def available() -> set:
-    return {"MiniMax-M3", "MiniMax-M2.7"}
+    return {"MiniMax-M3.1-Flash", "MiniMax-M3"}
 
 
 class MiniMax(SambaNova):
     available_models = available()
-    default_model = "MiniMax-M3"
+    default_model = "MiniMax-M3.1-Flash"
     base_urls = {
         "global_en": "https://api.minimax.io/v1",
         "cn_zh": "https://api.minimaxi.com/v1",
@@ -15,7 +15,7 @@ class MiniMax(SambaNova):
 
     def __init__(self,
                  api_key: str,
-                 model="MiniMax-M3",
+                 model="MiniMax-M3.1-Flash",
                  messages=None,
                  system="You are a helpful assistant.",
                  remember=False,
@@ -38,3 +38,5 @@ class MiniMax(SambaNova):
                          remember=remember,
                          limit=limit,
                          endpoint=endpoint)
+        # The catalog lists current models, but explicit legacy/custom IDs remain valid.
+        self.model = model or self.default_model
