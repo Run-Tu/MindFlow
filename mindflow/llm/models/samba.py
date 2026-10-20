@@ -12,6 +12,9 @@ def available() -> set:
     return {"Meta-Llama-3.1-8B-Instruct", "Meta-Llama-3.1-70B-Instruct", "Meta-Llama-3.1-405B-Instruct", "Samba CoE", "Mistral-T5-7B-v1", "v1olet_merged_dpo_7B", "WestLake-7B-v2-laser-truthy-dpo", "DonutLM-v1", "SambaLingo Arabic", "SambaLingo Bulgarian", "SambaLingo Hungarian", "SambaLingo Russian", "SambaLingo Serbian (Cyrillic)", "SambaLingo Slovenian", "SambaLingo Thai", "SambaLingo Turkish", "SambaLingo Japanese"}
 
 class SambaNova:
+    available_models = available()
+    default_model = "Meta-Llama-3.1-8B-Instruct"
+
     def __init__(self, 
                  api_key: str,
                  model="Meta-Llama-3.1-8B-Instruct", 
@@ -21,10 +24,10 @@ class SambaNova:
                  limit=30,
                  endpoint= "https://api.sambanova.ai/v1/chat/completions"):
     
-        if model in available(): 
+        if model in self.available_models:
             self.model = model
         else: 
-            self.model = "Meta-Llama-3.1-8B-Instruct"
+            self.model = self.default_model
         
         self.api_key = api_key
         self.messages = [] if messages is None else messages
